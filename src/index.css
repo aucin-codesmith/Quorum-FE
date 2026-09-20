@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* QUORUM brand palette */
+  --color-ink-900: #262e35;
+  --color-ink-800: #313c45;
+  --color-ink-700: #3d4952;
+  --color-slate-600: #4f6271;
+  --color-slate-500: #5c7383;
+  --color-accent-500: #778ca4;
+  --color-accent-300: #9aacc0;
+  --color-mist-300: #b3bfcb;
+  --color-mist-200: #c6d0d9;
+  --color-mist-100: #d5dbe2;
+  --color-mist-50: #eef1f4;
+  --color-paper: #fbfbfa;
+
+  --color-success-600: #2f7a55;
+  --color-success-100: #e3f3ea;
+  --color-warning-600: #a86a1a;
+  --color-warning-100: #faedd9;
+  --color-danger-600: #b8433a;
+  --color-danger-100: #fbe7e5;
+
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+
+  --shadow-card: 0 1px 2px rgba(38, 46, 53, 0.04), 0 8px 24px -12px rgba(38, 46, 53, 0.14);
+  --shadow-panel: 0 1px 2px rgba(38, 46, 53, 0.03), 0 16px 40px -20px rgba(38, 46, 53, 0.20);
+  --shadow-pop: 0 24px 64px -24px rgba(38, 46, 53, 0.35);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background-color: var(--color-mist-50);
+    color: var(--color-ink-800);
+  }
+  ::selection {
+    background-color: var(--color-accent-300);
+    color: white;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-mist-300) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-mist-300);
+    border-radius: 999px;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes drawer-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in { animation: fade-in 0.15s ease-out; }
+.animate-modal-in { animation: modal-in 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-drawer-in { animation: drawer-in 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-toast-in { animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
