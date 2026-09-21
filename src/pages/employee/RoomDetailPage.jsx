@@ -1,32 +1,26 @@
-import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Users, MapPin, CheckCircle2, Clock, CalendarDays } from "lucide-react";
 import StatusBadge from "@/components/common/StatusBadge";
-import MockNotice from "@/components/common/MockNotice";
 import EmptyState from "@/components/common/EmptyState";
+import { ErrorState, PageSkeleton } from "@/components/common/QueryState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useReservations } from "@/hooks/useReservations";
-import { useRooms } from "@/hooks/useRooms";
+import { useRoom, useRoomSchedule } from "@/hooks/useRooms";
 import { formatTime } from "@/utils/format";
-import { todayISO } from "@/utils/date";
 
 export default function RoomDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getRoom } = useRooms();
-  const { reservations } = useReservations();
-  const room = getRoom(id);
+  const { room, isLoading, isError, error, refetch } = useRoom(id);
+  // Today's booked slots for everyone (an employee's own reservation list would miss other people's bookings).
+  const { slots } = useRoomSchedule(id);
 
-  // Today's schedule comes straight from reservations, so new bookings show up here.
-  const schedule = useMemo(() => {
-    const today = todayISO();
-    return reservations
-      .filter((r) => r.roomId === id && r.date === today && r.status === "upcoming")
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
-  }, [reservations, id]);
+  if (isLoading) return <PageSkeleton />;
 
-  if (!room) {
+  if (isError && error.status !== 404 && error.status !== 400) {
+    return <ErrorState error={error} onRetry={refetch} title="We couldn't load this room" />;
+  }
+  if (isError || !room) {
     return (
       <EmptyState
         icon={MapPin}
@@ -90,13 +84,13 @@ export default function RoomDetailPage() {
           <h2 className="mt-12 flex items-center gap-3 text-xl font-semibold">
             <CalendarDays size={20} className="text-primary-soft" /> Today&apos;s schedule
           </h2>
-          {schedule.length === 0 ? (
+          {slots.length === 0 ? (
             <p className="mt-4 text-[15px] text-muted-foreground">
               No meetings are scheduled for this room today, so it is open all day.
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {schedule.map((slot) => (
+              {slots.map((slot) => (
                 <div key={slot.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-tint px-4 py-3">
                   <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                     <Clock size={16} className="shrink-0" />
@@ -126,9 +120,6 @@ export default function RoomDetailPage() {
               >
                 Book this room
               </Button>
-              <div className="mt-6">
-                <MockNotice text="Availability shown is demonstration data for this prototype." />
-              </div>
             </CardContent>
           </Card>
         </div>

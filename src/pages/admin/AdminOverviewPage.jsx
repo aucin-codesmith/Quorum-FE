@@ -5,56 +5,49 @@ import PageHeader from "@/components/common/PageHeader";
 import StatCard from "@/components/common/StatCard";
 import StatusBadge from "@/components/common/StatusBadge";
 import EmptyState from "@/components/common/EmptyState";
+import { ErrorState, PageSkeleton } from "@/components/common/QueryState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useReservations } from "@/hooks/useReservations";
 import { useRooms } from "@/hooks/useRooms";
-import { useUsers } from "@/hooks/useUsers";
+import { useStats } from "@/hooks/useStats";
 import { formatDate, formatTime, formatTimeRange } from "@/utils/format";
-import { WORK_END, WORK_START, nowTime, timeToMinutes, todayISO } from "@/utils/date";
-
-const WORK_MINUTES = timeToMinutes(WORK_END) - timeToMinutes(WORK_START);
+import { nowTime } from "@/utils/date";
 
 export default function AdminOverviewPage() {
   const navigate = useNavigate();
-  const { rooms } = useRooms();
-  const { users } = useUsers();
-  const { reservations } = useReservations();
-
-  const { today, todayList, board, upcomingCount, inProgress } = useMemo(() => {
-    const today = todayISO();
-    const now = nowTime();
-    const live = reservations.filter((r) => r.status !== "cancelled");
-    const todayList = live
-      .filter((r) => r.date === today)
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-    const board = rooms.map((room) => {
-      const mine = todayList.filter((r) => r.roomId === room.id);
-      const current = mine.find((r) => r.status === "upcoming" && r.startTime <= now && now < r.endTime);
-      const next = mine.find((r) => r.status === "upcoming" && r.startTime > now);
-      const booked = mine.reduce((sum, r) => sum + (timeToMinutes(r.endTime) - timeToMinutes(r.startTime)), 0);
-      return { room, current, next, utilization: Math.min(100, Math.round((booked / WORK_MINUTES) * 100)) };
-    });
-
-    return {
-      today,
-      todayList,
-      board,
-      upcomingCount: reservations.filter((r) => r.status === "upcoming").length,
-      inProgress: board.filter((b) => b.current).length,
-    };
-  }, [reservations, rooms]);
-
-  const recent = useMemo(
-    () => [...reservations].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5),
-    [reservations]
+  const { stats, isLoading: statsLoading, isError, error, refetch } = useStats();
+  const { rooms, isLoading: roomsLoading } = useRooms();
+  // "Today" is the server's date, so this page agrees with the API's own numbers.
+  const today = stats?.date;
+  const { reservations: todayAll, isLoading: todayLoading } = useReservations(
+    { date: today, sort: "startTime" },
+    { enabled: Boolean(today) }
   );
+  const { reservations: recent } = useReservations({ sort: "-createdAt", limit: 5 });
 
-  const availableRooms = rooms.filter((r) => r.status === "available").length;
-  const activeUsers = users.filter((u) => u.status === "active").length;
+  const todayList = useMemo(() => todayAll.filter((r) => r.status !== "cancelled"), [todayAll]);
+
+  const board = useMemo(() => {
+    const now = nowTime();
+    const utilization = Object.fromEntries((stats?.roomUtilization ?? []).map((u) => [u.roomId, u.utilizationPercent]));
+    return rooms.map((room) => {
+      const mine = todayList.filter((r) => r.roomId === room.id && r.status === "upcoming");
+      return {
+        room,
+        current: mine.find((r) => r.startTime <= now && now < r.endTime),
+        next: mine.find((r) => r.startTime > now),
+        utilization: utilization[room.id] ?? 0,
+      };
+    });
+  }, [rooms, todayList, stats]);
+
+  if (isError) return <ErrorState error={error} onRetry={refetch} title="We couldn't load the overview" />;
+  if (statsLoading || roomsLoading || todayLoading) return <PageSkeleton blocks={4} />;
+
+  const inProgress = board.filter((b) => b.current).length;
 
   return (
     <div className="space-y-12">
@@ -69,15 +62,10 @@ export default function AdminOverviewPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Rooms" value={rooms.length} icon={Building2} hint={`${availableRooms} available`} />
-        <StatCard
-          label="Booked today"
-          value={todayList.length}
-          icon={CalendarRange}
-          hint={`${inProgress} in progress now`}
-        />
-        <StatCard label="Upcoming reservations" value={upcomingCount} icon={CalendarClock} />
-        <StatCard label="Active users" value={activeUsers} icon={Users} hint={`of ${users.length} accounts`} />
+        <StatCard label="Rooms" value={stats.rooms.total} icon={Building2} hint={`${stats.rooms.available} available`} />
+        <StatCard label="Booked today" value={stats.reservations.today} icon={CalendarRange} hint={`${inProgress} in progress now`} />
+        <StatCard label="Upcoming reservations" value={stats.reservations.upcoming} icon={CalendarClock} />
+        <StatCard label="Active users" value={stats.users.active} icon={Users} hint={`of ${stats.users.total} accounts`} />
       </div>
 
       <section>

@@ -4,6 +4,7 @@ import { Search, CalendarPlus, CalendarX2 } from "lucide-react";
 import PageHeader from "@/components/common/PageHeader";
 import IconInput from "@/components/common/IconInput";
 import EmptyState from "@/components/common/EmptyState";
+import { ErrorState, ListSkeleton } from "@/components/common/QueryState";
 import ReservationCard from "@/components/reservations/ReservationCard";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,7 +19,7 @@ const tabs = [
 
 export default function MyReservationsPage() {
   const navigate = useNavigate();
-  const { myReservations: reservations } = useReservations();
+  const { reservations, isLoading, isError, error, refetch } = useReservations();
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
 
@@ -76,7 +77,11 @@ export default function MyReservationsPage() {
         />
       </div>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <ListSkeleton />
+      ) : isError ? (
+        <ErrorState error={error} onRetry={refetch} title="We couldn't load your reservations" />
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={CalendarX2}
           title="Nothing here yet"

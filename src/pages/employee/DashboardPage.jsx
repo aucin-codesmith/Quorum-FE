@@ -1,32 +1,51 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { formatDistanceToNow } from "date-fns";
 import { CalendarPlus, CalendarClock, CheckCircle2, Activity, ArrowRight } from "lucide-react";
 import PageHeader from "@/components/common/PageHeader";
 import StatCard from "@/components/common/StatCard";
 import EmptyState from "@/components/common/EmptyState";
+import { ErrorState, PageSkeleton } from "@/components/common/QueryState";
 import RoomCard from "@/components/rooms/RoomCard";
 import ReservationCard from "@/components/reservations/ReservationCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { activityFeed } from "@/data/mockData";
 import { useAuth } from "@/hooks/useAuth";
 import { useReservations } from "@/hooks/useReservations";
 import { useRooms } from "@/hooks/useRooms";
 
+// Recent activity is derived from the user's own reservations rather than a separate feed.
+function buildActivity(reservations) {
+  const events = [];
+  for (const r of reservations) {
+    events.push({ id: `${r.id}-booked`, at: r.createdAt, text: `You booked ${r.roomName} for \u201C${r.title}\u201D` });
+    if (r.status === "cancelled") {
+      events.push({ id: `${r.id}-cancelled`, at: r.updatedAt, text: `You cancelled \u201C${r.title}\u201D in ${r.roomName}` });
+    } else if (r.status === "completed") {
+      events.push({ id: `${r.id}-done`, at: r.updatedAt, text: `Your ${r.roomName} reservation \u201C${r.title}\u201D was completed` });
+    }
+  }
+  return events.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 4);
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { rooms } = useRooms();
-  const { myReservations } = useReservations();
+  const { rooms } = useRooms({ status: "available", limit: 2 });
+  const { reservations, isLoading, isError, error, refetch } = useReservations();
 
   const upcoming = useMemo(
-    () => myReservations.filter((r) => r.status === "upcoming").sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)),
-    [myReservations]
+    () =>
+      reservations
+        .filter((r) => r.status === "upcoming")
+        .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)),
+    [reservations]
   );
-  const completed = useMemo(
-    () => myReservations.filter((r) => r.status === "completed").length,
-    [myReservations]
-  );
+  const completed = useMemo(() => reservations.filter((r) => r.status === "completed").length, [reservations]);
+  const activity = useMemo(() => buildActivity(reservations), [reservations]);
+
+  if (isLoading) return <PageSkeleton />;
+  if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
   const firstName = user.name.split(" ")[0];
   const active = upcoming.length;
@@ -79,17 +98,21 @@ export default function DashboardPage() {
             )}
           </section>
 
-          <section>
-            <h2 className="mb-6 text-xl font-semibold">Recent activity</h2>
-            <Card className="gap-0 divide-y py-0">
-              {activityFeed.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-4 px-6 py-4">
-                  <p className="text-[15px] text-foreground/80">{item.text}</p>
-                  <span className="shrink-0 text-sm text-muted-foreground">{item.time}</span>
-                </div>
-              ))}
-            </Card>
-          </section>
+          {activity.length > 0 && (
+            <section>
+              <h2 className="mb-6 text-xl font-semibold">Recent activity</h2>
+              <Card className="gap-0 divide-y py-0">
+                {activity.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-4 px-6 py-4">
+                    <p className="text-[15px] text-foreground/80">{item.text}</p>
+                    <span className="shrink-0 text-sm text-muted-foreground">
+                      {formatDistanceToNow(new Date(item.at), { addSuffix: true })}
+                    </span>
+                  </div>
+                ))}
+              </Card>
+            </section>
+          )}
         </div>
 
         <section>
@@ -100,12 +123,9 @@ export default function DashboardPage() {
             </Button>
           </div>
           <div className="space-y-6">
-            {rooms
-              .filter((r) => r.status === "available")
-              .slice(0, 2)
-              .map((room) => (
-                <RoomCard key={room.id} room={room} />
-              ))}
+            {rooms.map((room) => (
+              <RoomCard key={room.id} room={room} />
+            ))}
           </div>
         </section>
       </div>

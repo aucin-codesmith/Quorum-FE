@@ -1,77 +1,101 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Ban, CalendarRange, CheckCheck, Eye, Plus, Trash2 } from "lucide-react";
 import PageHeader from "@/components/common/PageHeader";
 import StatusBadge from "@/components/common/StatusBadge";
 import EmptyState from "@/components/common/EmptyState";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
+import DataPagination from "@/components/common/DataPagination";
+import { ErrorState, TableSkeleton } from "@/components/common/QueryState";
 import RowMenu from "@/components/admin/RowMenu";
 import ReservationSheet from "@/components/admin/ReservationSheet";
 import TableFilters from "@/components/admin/TableFilters";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useReservations } from "@/hooks/useReservations";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useReservationMutations, useReservations } from "@/hooks/useReservations";
 import { useRooms } from "@/hooks/useRooms";
+import { useStats } from "@/hooks/useStats";
 import { useToast } from "@/hooks/useToast";
+import { errorMessage } from "@/lib/formErrors";
 import { formatDate, formatTimeRange } from "@/utils/format";
 
-const statusLabels = [
-  { value: "any", label: "All statuses", key: "all" },
-  { value: "upcoming", label: "Upcoming", key: "upcoming" },
-  { value: "completed", label: "Completed", key: "completed" },
-  { value: "cancelled", label: "Cancelled", key: "cancelled" },
-];
+const PAGE_SIZE = 10;
 
 export default function AdminReservationsPage() {
   const navigate = useNavigate();
-  const { rooms } = useRooms();
-  const { reservations, cancelReservation, completeReservation, deleteReservation } = useReservations();
   const { notify } = useToast();
-  const [status, setStatus] = useState("any");
   const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("any");
   const [roomId, setRoomId] = useState("any");
+  const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState(null);
   const [confirm, setConfirm] = useState(null); // { kind: "cancel" | "delete", reservation }
 
-  const counts = useMemo(() => {
-    const c = { all: reservations.length, upcoming: 0, completed: 0, cancelled: 0 };
-    reservations.forEach((r) => (c[r.status] += 1));
-    return c;
-  }, [reservations]);
+  const q = useDebouncedValue(query.trim());
+  const { reservations, meta, isLoading, isFetching, isError, error, refetch } = useReservations({
+    page,
+    limit: PAGE_SIZE,
+    q,
+    status: status === "any" ? undefined : status,
+    roomId: roomId === "any" ? undefined : roomId,
+    sort: "-date",
+  });
+  const { rooms } = useRooms();
+  const { stats } = useStats();
+  const { cancelReservation, completeReservation, deleteReservation } = useReservationMutations();
 
-  const filtered = useMemo(
-    () =>
-      reservations
-        .filter((r) => status === "any" || r.status === status)
-        .filter((r) => roomId === "any" || r.roomId === roomId)
-        .filter((r) => `${r.title} ${r.userName} ${r.roomName} ${r.id}`.toLowerCase().includes(query.toLowerCase()))
-        .sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime)),
-    [reservations, status, roomId, query]
-  );
+  // If the current page no longer exists (e.g. its last row was deleted or filtered out), step back.
+  // Adjusting state during render is React's supported pattern for state derived from other data.
+  if (meta && page > meta.totalPages) setPage(meta.totalPages);
 
-  // Derived from the store so the sheet always reflects the latest status.
+  const c = stats?.reservations;
+  const withCount = (label, n) => (c ? `${label} (${n})` : label);
+  const statusOptions = [
+    { value: "any", label: withCount("All statuses", c?.total) },
+    { value: "upcoming", label: withCount("Upcoming", c?.upcoming) },
+    { value: "completed", label: withCount("Completed", c?.completed) },
+    { value: "cancelled", label: withCount("Cancelled", c?.cancelled) },
+  ];
+  const roomOptions = [{ value: "any", label: "All rooms" }, ...rooms.map((r) => ({ value: r.id, label: r.name }))];
+
+  // Derived from the current page so the sheet reflects the latest status after an action.
   const opened = reservations.find((r) => r.id === openId) ?? null;
 
-  const complete = (r) => {
-    completeReservation(r.id);
-    notify("Marked as completed", { description: r.title });
-  };
-
-  const runConfirm = () => {
-    const { kind, reservation: r } = confirm;
-    if (kind === "cancel") {
-      cancelReservation(r.id);
-      notify("Reservation cancelled", { description: `${r.title} was cancelled.`, variant: "danger" });
-    } else {
-      deleteReservation(r.id);
-      setOpenId(null);
-      notify("Record deleted", { description: `${r.title} was removed.`, variant: "danger" });
+  const complete = async (r) => {
+    try {
+      await completeReservation(r.id);
+      notify("Marked as completed", { description: r.title });
+    } catch (err) {
+      notify("Could not update the reservation", { description: errorMessage(err), variant: "danger" });
     }
-    setConfirm(null);
   };
 
-  const roomOptions = [{ value: "any", label: "All rooms" }, ...rooms.map((r) => ({ value: r.id, label: r.name }))];
+  const runConfirm = async () => {
+    const { kind, reservation: r } = confirm;
+    setConfirm(null);
+    try {
+      if (kind === "cancel") {
+        await cancelReservation(r.id);
+        notify("Reservation cancelled", { description: `${r.title} was cancelled.`, variant: "danger" });
+      } else {
+        await deleteReservation(r.id);
+        setOpenId(null);
+        notify("Record deleted", { description: `${r.title} was removed.`, variant: "danger" });
+      }
+    } catch (err) {
+      notify(kind === "cancel" ? "Could not cancel the reservation" : "Could not delete the record", {
+        description: errorMessage(err),
+        variant: "danger",
+      });
+    }
+  };
+
+  const resetPage = (setter) => (value) => {
+    setter(value);
+    setPage(1);
+  };
 
   return (
     <div className="space-y-8">
@@ -87,27 +111,25 @@ export default function AdminReservationsPage() {
 
       <TableFilters
         query={query}
-        onQueryChange={setQuery}
+        onQueryChange={resetPage(setQuery)}
         searchPlaceholder="Search title, person or room…"
         searchLabel="Search reservations"
-        summary={`${filtered.length} of ${counts.all} reservations`}
+        summary={meta ? `${meta.total} ${meta.total === 1 ? "reservation" : "reservations"}` : undefined}
         filters={[
-          {
-            key: "status",
-            label: "Status",
-            value: status,
-            onChange: setStatus,
-            options: statusLabels.map((o) => ({ value: o.value, label: `${o.label} (${counts[o.key]})` })),
-          },
-          { key: "room", label: "Room", value: roomId, onChange: setRoomId, options: roomOptions },
+          { key: "status", label: "Status", value: status, onChange: resetPage(setStatus), options: statusOptions },
+          { key: "room", label: "Room", value: roomId, onChange: resetPage(setRoomId), options: roomOptions },
         ]}
       />
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <TableSkeleton />
+      ) : isError ? (
+        <ErrorState error={error} onRetry={refetch} title="We couldn't load the reservations" />
+      ) : reservations.length === 0 ? (
         <EmptyState
           icon={CalendarRange}
           title="No reservations here"
-          description="Nothing matches this filter yet. Try another tab, or create a reservation."
+          description="Nothing matches this filter yet. Try another filter, or create a reservation."
           action={
             <Button variant="outline" size="sm" onClick={() => navigate("/admin/reservations/new")}>
               <Plus /> New reservation
@@ -115,70 +137,72 @@ export default function AdminReservationsPage() {
           }
         />
       ) : (
-        <Card className="py-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Meeting</TableHead>
-                <TableHead>Room</TableHead>
-                <TableHead>When</TableHead>
-                <TableHead>Booked by</TableHead>
-                <TableHead>Guests</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-12">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell>
-                    <button
-                      onClick={() => setOpenId(r.id)}
-                      className="max-w-56 truncate text-left font-semibold text-foreground hover:underline"
-                    >
-                      {r.title}
-                    </button>
-                    <p className="text-sm text-muted-foreground">{r.id}</p>
-                  </TableCell>
-                  <TableCell>{r.roomName}</TableCell>
-                  <TableCell>
-                    <p className="text-foreground">{formatDate(r.date, { short: true })}</p>
-                    <p className="text-sm text-muted-foreground">{formatTimeRange(r.startTime, r.endTime)}</p>
-                  </TableCell>
-                  <TableCell>{r.userName}</TableCell>
-                  <TableCell>{r.participants}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={r.status} />
-                  </TableCell>
-                  <TableCell>
-                    <RowMenu
-                      label={`Actions for ${r.title}`}
-                      items={[
-                        { label: "View details", icon: Eye, onSelect: () => setOpenId(r.id) },
-                        { label: "Mark as completed", icon: CheckCheck, hidden: r.status !== "upcoming", onSelect: () => complete(r) },
-                        {
-                          label: "Cancel reservation",
-                          icon: Ban,
-                          hidden: r.status !== "upcoming",
-                          onSelect: () => setConfirm({ kind: "cancel", reservation: r }),
-                        },
-                        {
-                          label: "Delete record",
-                          icon: Trash2,
-                          destructive: true,
-                          separatorBefore: true,
-                          onSelect: () => setConfirm({ kind: "delete", reservation: r }),
-                        },
-                      ]}
-                    />
-                  </TableCell>
+        <div className="space-y-6">
+          <Card className={`py-0 transition-opacity ${isFetching ? "opacity-60" : ""}`}>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Meeting</TableHead>
+                  <TableHead>Room</TableHead>
+                  <TableHead>When</TableHead>
+                  <TableHead>Booked by</TableHead>
+                  <TableHead>Guests</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-12">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+              </TableHeader>
+              <TableBody>
+                {reservations.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>
+                      <button
+                        onClick={() => setOpenId(r.id)}
+                        className="max-w-56 truncate text-left font-semibold text-foreground hover:underline"
+                      >
+                        {r.title}
+                      </button>
+                    </TableCell>
+                    <TableCell>{r.roomName}</TableCell>
+                    <TableCell>
+                      <p className="text-foreground">{formatDate(r.date, { short: true })}</p>
+                      <p className="text-sm text-muted-foreground">{formatTimeRange(r.startTime, r.endTime)}</p>
+                    </TableCell>
+                    <TableCell>{r.userName}</TableCell>
+                    <TableCell>{r.participants}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={r.status} />
+                    </TableCell>
+                    <TableCell>
+                      <RowMenu
+                        label={`Actions for ${r.title}`}
+                        items={[
+                          { label: "View details", icon: Eye, onSelect: () => setOpenId(r.id) },
+                          { label: "Mark as completed", icon: CheckCheck, hidden: r.status !== "upcoming", onSelect: () => complete(r) },
+                          {
+                            label: "Cancel reservation",
+                            icon: Ban,
+                            hidden: r.status !== "upcoming",
+                            onSelect: () => setConfirm({ kind: "cancel", reservation: r }),
+                          },
+                          {
+                            label: "Delete record",
+                            icon: Trash2,
+                            destructive: true,
+                            separatorBefore: true,
+                            onSelect: () => setConfirm({ kind: "delete", reservation: r }),
+                          },
+                        ]}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+          <DataPagination meta={meta} onPageChange={setPage} />
+        </div>
       )}
 
       <ReservationSheet
@@ -196,7 +220,7 @@ export default function AdminReservationsPage() {
         description={
           confirm?.kind === "cancel"
             ? `${confirm.reservation.title} is booked by ${confirm.reservation.userName}. The room is freed for that slot.`
-            : `${confirm?.reservation.title} is removed from every list and can't be restored in this session.`
+            : `${confirm?.reservation.title} is removed from every list and can't be restored.`
         }
         confirmLabel={confirm?.kind === "cancel" ? "Cancel reservation" : "Delete record"}
         cancelLabel="Keep it"

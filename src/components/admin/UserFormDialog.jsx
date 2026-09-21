@@ -1,6 +1,5 @@
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMemo } from "react";
 import { z } from "zod";
 import SimpleSelect from "@/components/common/SimpleSelect";
 import { Button } from "@/components/ui/button";
@@ -8,38 +7,45 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/useToast";
+import { applyApiErrors, errorMessage } from "@/lib/formErrors";
 
 const roleOptions = [
   { value: "employee", label: "Employee" },
   { value: "admin", label: "Administrator" },
 ];
 
-function buildSchema(otherEmails) {
-  return z.object({
+const passwordRules = z
+  .string()
+  .min(8, "Use at least 8 characters.")
+  .max(72, "Use at most 72 characters.")
+  .regex(/[A-Za-z]/, "Include a letter.")
+  .regex(/\d/, "Include a number.");
+
+// Email uniqueness is enforced by the API (409), which the form maps back onto the email field.
+// When editing, an empty password means "keep the current one".
+const buildSchema = (isEdit) =>
+  z.object({
     name: z.string().trim().min(2, "Enter the person's full name."),
-    email: z
-      .string()
-      .trim()
-      .email("Enter a valid email address.")
-      .refine((v) => !otherEmails.includes(v.toLowerCase()), "Another user already has this email."),
+    email: z.string().trim().pipe(z.email("Enter a valid email address.")),
+    password: isEdit ? z.union([z.literal(""), passwordRules]) : passwordRules,
     jobTitle: z.string().trim().min(2, "Enter a job title."),
     department: z.string().trim().min(2, "Enter a department."),
     role: z.enum(["employee", "admin"]),
     active: z.boolean(),
   });
-}
 
-function UserFormBody({ user, users, isSelf, onSubmit, onCancel }) {
-  const otherEmails = useMemo(
-    () => users.filter((u) => u.id !== user?.id).map((u) => u.email.toLowerCase()),
-    [users, user]
-  );
-  const { control, handleSubmit } = useForm({
-    resolver: zodResolver(buildSchema(otherEmails)),
+const FIELDS = ["name", "email", "password", "jobTitle", "department", "role", "status"];
+
+function UserFormBody({ user, isSelf, onSubmit, onCancel }) {
+  const { notify } = useToast();
+  const { control, handleSubmit, setError, formState } = useForm({
+    resolver: zodResolver(buildSchema(Boolean(user))),
     mode: "onTouched",
     defaultValues: {
       name: user?.name ?? "",
       email: user?.email ?? "",
+      password: "",
       jobTitle: user?.jobTitle ?? "",
       department: user?.department ?? "",
       role: user?.role ?? "employee",
@@ -47,15 +53,21 @@ function UserFormBody({ user, users, isSelf, onSubmit, onCancel }) {
     },
   });
 
-  const submit = (v) =>
-    onSubmit({
-      name: v.name.trim(),
-      email: v.email.trim(),
-      jobTitle: v.jobTitle.trim(),
-      department: v.department.trim(),
-      role: v.role,
-      status: v.active ? "active" : "inactive",
-    });
+  const submit = async (v) => {
+    try {
+      await onSubmit({
+        name: v.name.trim(),
+        email: v.email.trim(),
+        jobTitle: v.jobTitle.trim(),
+        department: v.department.trim(),
+        role: v.role,
+        status: v.active ? "active" : "inactive",
+        ...(v.password && { password: v.password }),
+      });
+    } catch (err) {
+      if (!applyApiErrors(err, setError, FIELDS)) notify("Could not save the user", { description: errorMessage(err), variant: "danger" });
+    }
+  };
 
   const text = (name, label, props = {}) => (
     <Controller
@@ -76,6 +88,11 @@ function UserFormBody({ user, users, isSelf, onSubmit, onCancel }) {
       <FieldGroup className="gap-6">
         {text("name", "Full name", { placeholder: "e.g. Alya Ramadhani" })}
         {text("email", "Work email", { type: "email", placeholder: "name@company.com" })}
+        {text("password", user ? "New password (optional)" : "Password", {
+          type: "password",
+          autoComplete: "new-password",
+          placeholder: user ? "Leave blank to keep the current password" : "At least 8 characters, with a letter and a number",
+        })}
         {text("jobTitle", "Job title", { placeholder: "e.g. Product Design Lead" })}
         {text("department", "Department", { placeholder: "e.g. Design & Research" })}
         <Controller
@@ -118,24 +135,26 @@ function UserFormBody({ user, users, isSelf, onSubmit, onCancel }) {
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit">{user ? "Save changes" : "Add user"}</Button>
+        <Button type="submit" disabled={formState.isSubmitting}>
+          {formState.isSubmitting ? "Saving…" : user ? "Save changes" : "Add user"}
+        </Button>
       </DialogFooter>
     </form>
   );
 }
 
 // user = null adds a new user; a user object edits them.
-export default function UserFormDialog({ open, onOpenChange, user, users, isSelf = false, onSubmit }) {
+export default function UserFormDialog({ open, onOpenChange, user, isSelf = false, onSubmit }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{user ? `Edit ${user.name}` : "Add a user"}</DialogTitle>
           <DialogDescription>
-            {user ? "Changes apply immediately." : "New users can sign in right away with their work email."}
+            {user ? "Changes apply immediately." : "They can sign in straight away with this email and password."}
           </DialogDescription>
         </DialogHeader>
-        <UserFormBody user={user} users={users} isSelf={isSelf} onSubmit={onSubmit} onCancel={() => onOpenChange(false)} />
+        <UserFormBody user={user} isSelf={isSelf} onSubmit={onSubmit} onCancel={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );

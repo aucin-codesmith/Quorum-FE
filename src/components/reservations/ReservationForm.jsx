@@ -3,9 +3,11 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { AlertCircle, CalendarDays, CheckCircle2, Clock, MapPin, Type, Users } from "lucide-react";
 import IconInput from "@/components/common/IconInput";
+import { ErrorState, PageSkeleton } from "@/components/common/QueryState";
 import SimpleSelect from "@/components/common/SimpleSelect";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -15,12 +17,13 @@ import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
-import { useReservations } from "@/hooks/useReservations";
-import { useRooms } from "@/hooks/useRooms";
+import { useReservationMutations } from "@/hooks/useReservations";
+import { useRoomSchedule, useRooms } from "@/hooks/useRooms";
 import { useToast } from "@/hooks/useToast";
 import { useUsers } from "@/hooks/useUsers";
+import { applyApiErrors, errorMessage } from "@/lib/formErrors";
 import { formatDate, formatTime, formatTimeRange } from "@/utils/format";
-import { timeSlots, timeToMinutes, toISODate } from "@/utils/date";
+import { overlaps, timeSlots, timeToMinutes, toISODate } from "@/utils/date";
 
 const startOfToday = () => {
   const d = new Date();
@@ -64,14 +67,30 @@ function buildSchema({ rooms, isAdmin }) {
     });
 }
 
+const FORM_FIELDS = ["userId", "roomId", "title", "description", "date", "startTime", "endTime", "participants"];
+
 // mode="employee": books for the signed-in user. mode="admin": adds a "Booked for" field.
+// The form only mounts once rooms (and, for admins, users) have loaded, so its defaults are complete.
 export default function ReservationForm({ mode = "employee", onDone }) {
+  const isAdmin = mode === "admin";
+  const rooms = useRooms();
+  const users = useUsers({ status: "active" }, { enabled: isAdmin });
+
+  const isLoading = rooms.isLoading || (isAdmin && users.isLoading);
+  const failed = rooms.isError ? rooms : isAdmin && users.isError ? users : null;
+
+  if (isLoading) return <PageSkeleton blocks={2} />;
+  if (failed) return <ErrorState error={failed.error} onRetry={failed.refetch} title="We couldn't load the booking form" />;
+
+  return <ReservationFormBody mode={mode} onDone={onDone} rooms={rooms.rooms} users={users.users} />;
+}
+
+function ReservationFormBody({ mode, onDone, rooms, users }) {
   const isAdmin = mode === "admin";
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { rooms } = useRooms();
-  const { users } = useUsers();
-  const { addReservation, findConflict } = useReservations();
+  const qc = useQueryClient();
+  const { addReservation } = useReservationMutations();
   const { notify } = useToast();
   const [confirmValues, setConfirmValues] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -82,7 +101,7 @@ export default function ReservationForm({ mode = "employee", onDone }) {
   const preselected = searchParams.get("room");
   const defaultRoom = rooms.find((r) => r.id === preselected && r.status === "available") ?? rooms.find((r) => r.status === "available");
 
-  const { control, handleSubmit, setValue, formState } = useForm({
+  const { control, handleSubmit, setValue, setError, formState } = useForm({
     resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
@@ -105,10 +124,14 @@ export default function ReservationForm({ mode = "employee", onDone }) {
   const room = rooms.find((r) => r.id === roomId);
   const owner = users.find((u) => u.id === (isAdmin ? userId : user.id));
 
+  // The day's booked slots come from the server (everyone's, not only mine), so the check is accurate for employees too.
+  // The API still has the final word on submit.
+  const dateISO = date ? toISODate(date) : undefined;
+  const { slots } = useRoomSchedule(roomId, dateISO, { enabled: Boolean(roomId && dateISO) });
   const conflict = useMemo(() => {
-    if (!roomId || !date || !startTime || !endTime || timeToMinutes(endTime) <= timeToMinutes(startTime)) return null;
-    return findConflict({ roomId, date: toISODate(date), startTime, endTime });
-  }, [findConflict, roomId, date, startTime, endTime]);
+    if (!startTime || !endTime || timeToMinutes(endTime) <= timeToMinutes(startTime)) return null;
+    return slots.find((slot) => overlaps(slot.startTime, slot.endTime, startTime, endTime)) ?? null;
+  }, [slots, startTime, endTime]);
 
   const roomUnavailable = room && room.status !== "available";
   const blocked = Boolean(conflict) || Boolean(roomUnavailable);
@@ -130,20 +153,14 @@ export default function ReservationForm({ mode = "employee", onDone }) {
     setConfirmValues(values);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const v = confirmValues;
     const target = rooms.find((r) => r.id === v.roomId);
-    // Re-check at the last moment in case the slot was taken while the dialog was open.
-    if (findConflict({ roomId: v.roomId, date: toISODate(v.date), startTime: v.startTime, endTime: v.endTime })) {
-      setConfirmValues(null);
-      notify("That slot was just taken", { description: "Pick another time or room.", variant: "danger" });
-      return;
-    }
     setSubmitting(true);
-    setTimeout(() => {
-      const created = addReservation({
+    try {
+      const created = await addReservation({
         roomId: v.roomId,
-        userId: isAdmin ? v.userId : user.id,
+        ...(isAdmin && { userId: v.userId }),
         title: v.title.trim(),
         description: v.description.trim(),
         date: toISODate(v.date),
@@ -151,14 +168,24 @@ export default function ReservationForm({ mode = "employee", onDone }) {
         endTime: v.endTime,
         participants: Number(v.participants),
       });
-      setSubmitting(false);
       setConfirmValues(null);
       notify("Reservation confirmed", {
         description: `${target.name} is booked for ${formatDate(created.date, { short: true })}.`,
         variant: "success",
       });
       onDone?.(created);
-    }, 600);
+    } catch (err) {
+      setConfirmValues(null);
+      // Someone may have taken the slot since the schedule was loaded: refresh it, then explain.
+      qc.invalidateQueries({ queryKey: ["schedule"] });
+      applyApiErrors(err, setError, FORM_FIELDS);
+      notify(err.code === "RESERVATION_CONFLICT" ? "That slot was just taken" : "Could not book the room", {
+        description: errorMessage(err),
+        variant: "danger",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const summaryRows = [

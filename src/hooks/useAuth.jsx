@@ -1,61 +1,81 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { DEFAULT_ADMIN_ID, DEFAULT_EMPLOYEE_ID } from "@/data/mockData";
-import { useUsers } from "@/hooks/useUsers";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { api, setUnauthorizedHandler, tokenStore } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 
-// Mock session: only the signed-in user's id is kept, and it is resolved against the
-// users store on every render so admin edits to a profile show up immediately.
-// Swap login/logout for real auth calls once the backend exists.
+// Real session: a JWT from the API, kept in localStorage and re-validated with GET /api/auth/me on load.
 
 const AuthContext = createContext(null);
-const STORAGE_KEY = "quorum.session";
-
-function readStoredId() {
-  try {
-    return localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function storeId(id) {
-  try {
-    if (id) localStorage.setItem(STORAGE_KEY, id);
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Storage can be blocked (private window); the session then lasts until reload.
-  }
-}
 
 export function AuthProvider({ children }) {
-  const { users } = useUsers();
-  const [userId, setUserId] = useState(readStoredId);
+  const [user, setUser] = useState(null);
+  // True only while a stored token is being checked, so guards do not bounce a signed-in user to /login on reload.
+  const [loading, setLoading] = useState(() => Boolean(tokenStore.get()));
+  // Set when the stored session could not be checked because the server was unreachable or failing.
+  const [restoreError, setRestoreError] = useState(null);
 
-  const user = useMemo(() => users.find((u) => u.id === userId) ?? null, [users, userId]);
-
-  // Returns { ok: true, user } or { ok: false, error }.
-  const login = useCallback(
-    (email) => {
-      const normalized = email.trim().toLowerCase();
-      const match = users.find((u) => u.email.toLowerCase() === normalized);
-      const fallbackId = normalized.includes("admin") ? DEFAULT_ADMIN_ID : DEFAULT_EMPLOYEE_ID;
-      const target = match ?? users.find((u) => u.id === fallbackId);
-
-      if (!target || target.status !== "active") {
-        return { ok: false, error: "This account is inactive. Ask an administrator to reactivate it." };
-      }
-      setUserId(target.id);
-      storeId(target.id);
-      return { ok: true, user: target };
-    },
-    [users]
+  const loadSession = useCallback(
+    () =>
+      api
+        .get("/api/auth/me")
+        .then((res) => setUser(res.data))
+        .catch((err) => {
+          // A rejected token is dropped. A network or server failure keeps it and offers a retry,
+          // instead of bouncing someone with a valid session to the login page.
+          if (err.status === 401 || err.status === 403) tokenStore.clear();
+          else setRestoreError(err);
+        })
+        .finally(() => setLoading(false)),
+    []
   );
 
-  const logout = useCallback(() => {
-    setUserId(null);
-    storeId(null);
+  useEffect(() => {
+    if (tokenStore.get()) loadSession();
+  }, [loadSession]);
+
+  const retrySession = useCallback(() => {
+    setRestoreError(null);
+    setLoading(true);
+    loadSession();
+  }, [loadSession]);
+
+  const clearSession = useCallback(() => {
+    tokenStore.clear();
+    setUser(null);
+    queryClient.clear(); // never show one person's cached data to the next
   }, []);
 
-  const value = useMemo(() => ({ user, isAdmin: user?.role === "admin", login, logout }), [user, login, logout]);
+  useEffect(() => {
+    setUnauthorizedHandler(clearSession);
+    return () => setUnauthorizedHandler(null);
+  }, [clearSession]);
+
+  const startSession = useCallback(({ token, user: nextUser }) => {
+    queryClient.clear();
+    tokenStore.set(token);
+    setUser(nextUser);
+  }, []);
+
+  // Both resolve to { ok: true, user } or { ok: false, error, code }.
+  const authenticate = useCallback(
+    async (path, body) => {
+      try {
+        const res = await api.post(path, { body, auth: false });
+        startSession(res.data);
+        return { ok: true, user: res.data.user };
+      } catch (err) {
+        return { ok: false, error: err.message, code: err.code, details: err.details };
+      }
+    },
+    [startSession]
+  );
+
+  const login = useCallback((email, password) => authenticate("/api/auth/login", { email, password }), [authenticate]);
+  const register = useCallback((payload) => authenticate("/api/auth/register", payload), [authenticate]);
+
+  const value = useMemo(
+    () => ({ user, loading, restoreError, retrySession, isAdmin: user?.role === "admin", login, register, logout: clearSession }),
+    [user, loading, restoreError, retrySession, login, register, clearSession]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -4,10 +4,11 @@ import PageHeader from "@/components/common/PageHeader";
 import IconInput from "@/components/common/IconInput";
 import SimpleSelect from "@/components/common/SimpleSelect";
 import EmptyState from "@/components/common/EmptyState";
+import { CardGridSkeleton, ErrorState } from "@/components/common/QueryState";
 import FacilitiesFilter from "@/components/rooms/FacilitiesFilter";
 import RoomCard from "@/components/rooms/RoomCard";
 import { Card, CardContent } from "@/components/ui/card";
-import { facilitiesCatalog } from "@/data/mockData";
+import { useFacilities } from "@/hooks/useFacilities";
 import { useRooms } from "@/hooks/useRooms";
 
 const capacityOptions = [
@@ -26,7 +27,8 @@ const sortOptions = [
 ];
 
 export default function FindRoomPage() {
-  const { rooms } = useRooms();
+  const { rooms, isLoading, isError, error, refetch } = useRooms();
+  const { facilities } = useFacilities();
   const [query, setQuery] = useState("");
   const [capacity, setCapacity] = useState("0");
   const [availability, setAvailability] = useState("any");
@@ -101,7 +103,7 @@ export default function FindRoomPage() {
           <div className="mt-6 flex flex-col gap-4 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <SlidersHorizontal size={16} className="mt-3 shrink-0 text-primary-soft" />
-              <FacilitiesFilter options={facilitiesCatalog} selected={selectedFacilities} onToggle={toggleFacility} />
+              <FacilitiesFilter options={facilities} selected={selectedFacilities} onToggle={toggleFacility} />
             </div>
             <SimpleSelect
               aria-label="Sort rooms"
@@ -114,22 +116,27 @@ export default function FindRoomPage() {
         </CardContent>
       </Card>
 
-      <p className="text-sm font-medium text-muted-foreground">
-        {filteredRooms.length} {filteredRooms.length === 1 ? "room" : "rooms"} found
-      </p>
-
-      {filteredRooms.length === 0 ? (
+      {isLoading ? (
+        <CardGridSkeleton />
+      ) : isError ? (
+        <ErrorState error={error} onRetry={refetch} title="We couldn't load the rooms" />
+      ) : filteredRooms.length === 0 ? (
         <EmptyState
           icon={DoorClosed}
           title="No rooms match your filters"
           description="Try a lower capacity or remove a facility to see more rooms."
         />
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredRooms.map((room) => (
-            <RoomCard key={room.id} room={room} />
-          ))}
-        </div>
+        <>
+          <p className="text-sm font-medium text-muted-foreground">
+            {filteredRooms.length} {filteredRooms.length === 1 ? "room" : "rooms"} found
+          </p>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredRooms.map((room) => (
+              <RoomCard key={room.id} room={room} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

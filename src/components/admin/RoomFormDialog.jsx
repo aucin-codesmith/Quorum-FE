@@ -1,6 +1,5 @@
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMemo } from "react";
 import { z } from "zod";
 import IconInput from "@/components/common/IconInput";
 import SimpleSelect from "@/components/common/SimpleSelect";
@@ -11,7 +10,9 @@ import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { facilitiesCatalog } from "@/data/mockData";
+import { useFacilities } from "@/hooks/useFacilities";
+import { useToast } from "@/hooks/useToast";
+import { applyApiErrors, errorMessage } from "@/lib/formErrors";
 import { Users } from "lucide-react";
 
 const statusOptions = [
@@ -20,13 +21,9 @@ const statusOptions = [
   { value: "maintenance", label: "Under maintenance" },
 ];
 
-function buildSchema(otherNames) {
-  return z.object({
-    name: z
-      .string()
-      .trim()
-      .min(2, "Enter a room name.")
-      .refine((v) => !otherNames.includes(v.toLowerCase()), "Another room already uses this name."),
+const schema = z.object({
+    // Name uniqueness is enforced by the API (409), which the form maps back onto this field.
+    name: z.string().trim().min(2, "Enter a room name."),
     floor: z.string().trim().min(2, "Enter the floor or location."),
     capacity: z
       .string()
@@ -36,16 +33,15 @@ function buildSchema(otherNames) {
     description: z.string().trim().max(400, "Keep the description under 400 characters."),
     image: z.string().trim().refine((v) => v === "" || /^https?:\/\/\S+$/.test(v), "Enter a full image URL, or leave empty."),
     facilities: z.array(z.string()),
-  });
-}
+});
 
-function RoomFormBody({ room, rooms, onSubmit, onCancel }) {
-  const otherNames = useMemo(
-    () => rooms.filter((r) => r.id !== room?.id).map((r) => r.name.toLowerCase()),
-    [rooms, room]
-  );
-  const { control, handleSubmit } = useForm({
-    resolver: zodResolver(buildSchema(otherNames)),
+const FIELDS = ["name", "floor", "capacity", "status", "description", "image", "facilities"];
+
+function RoomFormBody({ room, onSubmit, onCancel }) {
+  const { notify } = useToast();
+  const { facilities } = useFacilities();
+  const { control, handleSubmit, setError, formState } = useForm({
+    resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
       name: room?.name ?? "",
@@ -58,17 +54,23 @@ function RoomFormBody({ room, rooms, onSubmit, onCancel }) {
     },
   });
 
-  const submit = (v) =>
-    onSubmit({
-      name: v.name.trim(),
-      floor: v.floor.trim(),
-      capacity: Number(v.capacity),
-      status: v.status,
-      description: v.description.trim(),
-      facilities: v.facilities,
-      // Empty keeps the existing photo when editing, or the store default when adding.
-      ...(v.image.trim() ? { image: v.image.trim() } : {}),
-    });
+  const submit = async (v) => {
+    try {
+      await onSubmit({
+        name: v.name.trim(),
+        floor: v.floor.trim(),
+        capacity: Number(v.capacity),
+        status: v.status,
+        description: v.description.trim(),
+        facilities: v.facilities,
+        // Empty keeps the existing photo when editing, or the server default when adding.
+        ...(v.image.trim() ? { image: v.image.trim() } : {}),
+      });
+    } catch (err) {
+      // Field problems (duplicate name, bad values) land on their inputs; anything else becomes a toast.
+      if (!applyApiErrors(err, setError, FIELDS)) notify("Could not save the room", { description: errorMessage(err), variant: "danger" });
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit(submit)} noValidate className="grid gap-6">
@@ -145,7 +147,7 @@ function RoomFormBody({ room, rooms, onSubmit, onCancel }) {
             <FieldSet>
               <FieldLegend variant="label">Facilities</FieldLegend>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {facilitiesCatalog.map((f) => {
+                {facilities.map((f) => {
                   const id = `facility-${f.replace(/\s+/g, "-").toLowerCase()}`;
                   return (
                     <div key={f} className="flex items-center gap-3">
@@ -172,14 +174,16 @@ function RoomFormBody({ room, rooms, onSubmit, onCancel }) {
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit">{room ? "Save changes" : "Add room"}</Button>
+        <Button type="submit" disabled={formState.isSubmitting}>
+          {formState.isSubmitting ? "Saving…" : room ? "Save changes" : "Add room"}
+        </Button>
       </DialogFooter>
     </form>
   );
 }
 
 // room = null adds a new room; a room object edits it.
-export default function RoomFormDialog({ open, onOpenChange, room, rooms, onSubmit }) {
+export default function RoomFormDialog({ open, onOpenChange, room, onSubmit }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
@@ -189,7 +193,7 @@ export default function RoomFormDialog({ open, onOpenChange, room, rooms, onSubm
             {room ? "Changes apply immediately across the employee and admin views." : "New rooms appear in Find a room straight away."}
           </DialogDescription>
         </DialogHeader>
-        <RoomFormBody room={room} rooms={rooms} onSubmit={onSubmit} onCancel={() => onOpenChange(false)} />
+        <RoomFormBody room={room} onSubmit={onSubmit} onCancel={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );

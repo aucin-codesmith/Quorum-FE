@@ -3,28 +3,31 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, MapPin, CalendarDays, Clock, Users, Hash, AlignLeft, Ban, CalendarX2 } from "lucide-react";
 import StatusBadge from "@/components/common/StatusBadge";
 import EmptyState from "@/components/common/EmptyState";
+import { ErrorState, PageSkeleton } from "@/components/common/QueryState";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { useAuth } from "@/hooks/useAuth";
-import { useReservations } from "@/hooks/useReservations";
+import { useReservation, useReservationMutations } from "@/hooks/useReservations";
 import { useToast } from "@/hooks/useToast";
+import { errorMessage } from "@/lib/formErrors";
 import { formatDate, formatTimeRange } from "@/utils/format";
 
 export default function ReservationDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { getReservation, cancelReservation } = useReservations();
+  const { reservation, isLoading, isError, error, refetch } = useReservation(id);
+  const { cancelReservation } = useReservationMutations();
   const { notify } = useToast();
   const [cancelOpen, setCancelOpen] = useState(false);
 
-  const found = getReservation(id);
-  // Employees can only open their own reservations.
-  const reservation = found && found.userId === user.id ? found : null;
+  if (isLoading) return <PageSkeleton blocks={2} />;
 
-  if (!reservation) {
+  // The API answers 404 for a reservation that is missing or belongs to someone else.
+  if (isError && error.status !== 404 && error.status !== 400) {
+    return <ErrorState error={error} onRetry={refetch} title="We couldn't load this reservation" />;
+  }
+  if (isError || !reservation) {
     return (
       <EmptyState
         icon={CalendarX2}
@@ -41,13 +44,13 @@ export default function ReservationDetailPage() {
 
   const canCancel = reservation.status === "upcoming";
 
-  const handleCancel = () => {
-    cancelReservation(reservation.id);
-    setCancelOpen(false);
-    notify("Reservation cancelled", {
-      description: `${reservation.title} has been cancelled.`,
-      variant: "danger",
-    });
+  const handleCancel = async () => {
+    try {
+      await cancelReservation(reservation.id);
+      notify("Reservation cancelled", { description: `${reservation.title} has been cancelled.`, variant: "danger" });
+    } catch (err) {
+      notify("Could not cancel the reservation", { description: errorMessage(err), variant: "danger" });
+    }
   };
 
   return (
@@ -105,7 +108,7 @@ export default function ReservationDetailPage() {
         open={cancelOpen}
         onOpenChange={setCancelOpen}
         title="Cancel this reservation?"
-        description={`${reservation.title} in ${reservation.roomName} on ${formatDate(reservation.date, { short: true })}, ${formatTimeRange(reservation.startTime, reservation.endTime)}. This action cannot be undone in this session.`}
+        description={`${reservation.title} in ${reservation.roomName} on ${formatDate(reservation.date, { short: true })}, ${formatTimeRange(reservation.startTime, reservation.endTime)}. This cannot be undone.`}
         confirmLabel="Cancel reservation"
         cancelLabel="Keep reservation"
         onConfirm={handleCancel}

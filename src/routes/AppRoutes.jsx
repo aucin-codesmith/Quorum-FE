@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { HomeRedirect, RequireRole } from "./guards";
 import LoginPage from "@/pages/auth/LoginPage";
+import RegisterPage from "@/pages/auth/RegisterPage";
 import DashboardPage from "@/pages/employee/DashboardPage";
 import FindRoomPage from "@/pages/employee/FindRoomPage";
 import RoomDetailPage from "@/pages/employee/RoomDetailPage";
@@ -20,6 +21,7 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
       <Route element={<RequireRole role="employee" />}>
         <Route element={<AppLayout area="employee" />}>
