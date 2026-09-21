@@ -1,22 +1,19 @@
-export default function StatCard({ label, value, icon: Icon, tone = "default", trend }) {
-  const iconWrap = {
-    default: "bg-mist-100 text-slate-600",
-    accent: "bg-slate-600 text-white",
-    success: "bg-success-100 text-success-600",
-  }[tone];
+import { Card, CardContent } from "@/components/ui/card";
+
+// Supporting figure: quiet tinted surface, no border or shadow, so it never competes with the page's main action.
+export default function StatCard({ label, value, icon: Icon, hint, tone = "default" }) {
+  const iconColor = tone === "success" ? "text-success" : tone === "danger" ? "text-danger" : "text-primary-soft";
 
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-mist-200 bg-white p-5 shadow-card">
-      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${iconWrap}`}>
-        <Icon size={20} strokeWidth={2} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[13px] font-medium text-slate-500">{label}</p>
-        <div className="flex items-baseline gap-2">
-          <p className="font-display text-[26px] leading-none text-ink-800">{value}</p>
-          {trend && <span className="text-[12px] font-semibold text-success-600">{trend}</span>}
+    <Card className="bg-tint-soft shadow-none ring-0">
+      <CardContent className="flex items-center gap-4">
+        <Icon size={22} strokeWidth={1.75} className={`shrink-0 ${iconColor}`} />
+        <div className="min-w-0">
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="text-3xl leading-none font-semibold text-foreground">{value}</p>
+          {hint && <p className="mt-2 text-sm text-muted-foreground">{hint}</p>}
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
