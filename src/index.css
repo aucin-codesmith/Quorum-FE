@@ -1,34 +1,114 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @theme {
-  /* QUORUM brand palette */
-  --color-ink-900: #262e35;
-  --color-ink-800: #313c45;
-  --color-ink-700: #3d4952;
-  --color-slate-600: #4f6271;
-  --color-slate-500: #5c7383;
-  --color-accent-500: #778ca4;
-  --color-accent-300: #9aacc0;
-  --color-mist-300: #b3bfcb;
-  --color-mist-200: #c6d0d9;
-  --color-mist-100: #d5dbe2;
-  --color-mist-50: #eef1f4;
-  --color-paper: #fbfbfa;
+  /* Cloud Dancer palette — design-rules-meeting-room-booking.md */
+  --color-ink: #081f5c;
+  --color-primary-soft: #7096d1;
+  --color-tint: #d0e3ff;
+  --color-tint-soft: #e7f1ff;
+  --color-canvas: #f9fcff;
 
-  --color-success-600: #2f7a55;
-  --color-success-100: #e3f3ea;
-  --color-warning-600: #a86a1a;
-  --color-warning-100: #faedd9;
-  --color-danger-600: #b8433a;
-  --color-danger-100: #fbe7e5;
+  /* Semantic (muted, minimal use) */
+  --color-success: #37705a;
+  --color-success-bg: #e8f3ed;
+  --color-danger: #a65249;
+  --color-danger-bg: #f9ebe9;
+}
 
+/*
+ * shadcn tokens, mapped onto the six Cloud Dancer tokens plus the two muted
+ * semantic colours. No dark theme: the palette is intentionally light-only.
+ */
+:root {
+  --background: #f9fcff;
+  --foreground: #081f5c;
+  --card: #f9fcff;
+  --card-foreground: #081f5c;
+  --popover: #f9fcff;
+  --popover-foreground: #081f5c;
+  --primary: #334eac;
+  --primary-foreground: #f9fcff;
+  --secondary: #e7f1ff;
+  --secondary-foreground: #081f5c;
+  --muted: #e7f1ff;
+  --muted-foreground: color-mix(in srgb, #081f5c 70%, #f9fcff);
+  --accent: #e7f1ff;
+  --accent-foreground: #081f5c;
+  --destructive: #a65249;
+  --border: #d0e3ff;
+  --input: #d0e3ff;
+  --ring: #334eac;
+  --chart-1: #334eac;
+  --chart-2: #7096d1;
+  --chart-3: #d0e3ff;
+  --chart-4: #081f5c;
+  --chart-5: #e7f1ff;
+  /* One radius everywhere (design rules §4); pills use rounded-full. */
+  --radius: 0.75rem;
+  --sidebar: #f9fcff;
+  --sidebar-foreground: #081f5c;
+  --sidebar-primary: #334eac;
+  --sidebar-primary-foreground: #f9fcff;
+  --sidebar-accent: #d0e3ff;
+  --sidebar-accent-foreground: #081f5c;
+  --sidebar-border: #d0e3ff;
+  --sidebar-ring: #334eac;
+}
+
+@theme inline {
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-heading: var(--font-sans);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
-  --shadow-card: 0 1px 2px rgba(38, 46, 53, 0.04), 0 8px 24px -12px rgba(38, 46, 53, 0.14);
-  --shadow-panel: 0 1px 2px rgba(38, 46, 53, 0.03), 0 16px 40px -20px rgba(38, 46, 53, 0.20);
-  --shadow-pop: 0 24px 64px -24px rgba(38, 46, 53, 0.35);
+  /* Every radius step resolves to the same value. */
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
+  --radius-4xl: var(--radius);
+
+  /* One resting shadow, one hover/overlay shadow, both tinted toward primary. */
+  --shadow-2xs: none;
+  --shadow-xs: none;
+  --shadow-sm: 0 1px 3px color-mix(in srgb, #334eac 8%, transparent);
+  --shadow-md: 0 2px 8px color-mix(in srgb, #334eac 12%, transparent);
+  --shadow-lg: 0 2px 8px color-mix(in srgb, #334eac 12%, transparent);
+  --shadow-xl: 0 2px 8px color-mix(in srgb, #334eac 12%, transparent);
 }
 
 @layer base {
@@ -37,31 +117,34 @@
     -webkit-font-smoothing: antialiased;
   }
   body {
-    background-color: var(--color-mist-50);
-    color: var(--color-ink-800);
+    @apply bg-background text-foreground;
+    color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  h1, h2, h3, h4 {
+    color: var(--color-ink);
   }
   ::selection {
-    background-color: var(--color-accent-300);
-    color: white;
+    background-color: var(--color-tint);
+    color: var(--color-ink);
   }
   * {
+    @apply border-border;
     scrollbar-width: thin;
-    scrollbar-color: var(--color-mist-300) transparent;
+    scrollbar-color: var(--color-tint) transparent;
   }
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: var(--color-mist-300);
+    background-color: var(--color-tint);
     border-radius: 999px;
   }
 }
 
 @layer utilities {
-  .font-display {
-    font-family: var(--font-display);
-  }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -71,24 +154,12 @@
   }
 }
 
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* Motion only responds to a user action; reduced-motion switches it off. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
-@keyframes modal-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes drawer-in {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
-}
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in { animation: fade-in 0.15s ease-out; }
-.animate-modal-in { animation: modal-in 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
-.animate-drawer-in { animation: drawer-in 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
-.animate-toast-in { animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
