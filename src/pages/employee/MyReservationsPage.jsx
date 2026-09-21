@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, CalendarPlus, CalendarX2 } from "lucide-react";
-import PageHeader from "../../components/common/PageHeader";
-import Input from "../../components/common/Input";
-import Button from "../../components/common/Button";
-import ReservationCard from "../../components/reservations/ReservationCard";
-import EmptyState from "../../components/common/EmptyState";
-import { useReservations } from "../../hooks/useReservations";
+import PageHeader from "@/components/common/PageHeader";
+import IconInput from "@/components/common/IconInput";
+import EmptyState from "@/components/common/EmptyState";
+import ReservationCard from "@/components/reservations/ReservationCard";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useReservations } from "@/hooks/useReservations";
 
 const tabs = [
   { key: "all", label: "All" },
@@ -17,7 +18,7 @@ const tabs = [
 
 export default function MyReservationsPage() {
   const navigate = useNavigate();
-  const { reservations } = useReservations();
+  const { myReservations: reservations } = useReservations();
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
 
@@ -43,63 +44,51 @@ export default function MyReservationsPage() {
   }, [reservations, tab, query]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
-        eyebrow="Reservations"
-        title="My Reservations"
+        title="My reservations"
         description={`You have ${counts.upcoming} upcoming and ${counts.all} total reservations.`}
         actions={
-          <Button icon={CalendarPlus} onClick={() => navigate("/rooms")}>
-            New Reservation
+          <Button onClick={() => navigate("/booking")}>
+            <CalendarPlus /> New reservation
           </Button>
         }
       />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-1.5 overflow-x-auto rounded-xl bg-mist-100 p-1 sm:overflow-visible">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${
-                tab === t.key
-                  ? "bg-white text-ink-800 shadow-sm"
-                  : "text-slate-500 hover:text-ink-700"
-              }`}
-            >
-              {t.label}
-              <span
-                className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] ${
-                  tab === t.key ? "bg-mist-100 text-slate-600" : "bg-white/60 text-slate-500"
-                }`}
-              >
-                {counts[t.key]}
-              </span>
-            </button>
-          ))}
-        </div>
-        <Input
+        <Tabs value={tab} onValueChange={setTab} className="overflow-x-auto">
+          <TabsList>
+            {tabs.map((t) => (
+              <TabsTrigger key={t.key} value={t.key}>
+                {t.label}
+                <span className="ml-2 font-medium text-muted-foreground">{counts[t.key]}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <IconInput
           icon={Search}
           placeholder="Search reservations…"
+          aria-label="Search reservations"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="sm:w-64"
+          wrapperClassName="sm:w-72"
         />
       </div>
 
       {filtered.length === 0 ? (
         <EmptyState
           icon={CalendarX2}
-          title="No reservations here"
-          description="Reservations matching this filter will show up here."
+          title="Nothing here yet"
+          description="Reservations that match this filter will appear here. Start by choosing a room."
           action={
-            <Button size="sm" icon={CalendarPlus} onClick={() => navigate("/rooms")}>
-              Book a Room
+            <Button variant="outline" size="sm" onClick={() => navigate("/rooms")}>
+              <CalendarPlus /> Choose a room
             </Button>
           }
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filtered.map((r) => (
             <ReservationCard key={r.id} reservation={r} />
           ))}

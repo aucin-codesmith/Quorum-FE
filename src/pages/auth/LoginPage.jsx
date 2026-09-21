@@ -1,150 +1,169 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, CalendarClock, ShieldCheck, Users2 } from "lucide-react";
-import Logo from "../../components/layout/Logo";
-import Input from "../../components/common/Input";
-import Button from "../../components/common/Button";
-import { useToast } from "../../hooks/useToast";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import Logo from "@/components/layout/Logo";
+import IconInput from "@/components/common/IconInput";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/useToast";
+import { homeFor } from "@/routes/homeFor";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { notify } = useToast();
+  const { user, login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [form, setForm] = useState({ email: "", password: "" });
+
+  // Where the visitor was headed before being sent here (set by RequireRole).
+  const from = location.state?.from;
+  const wantsAdmin = from?.startsWith("/admin");
+
+  if (user && !loading) return <Navigate to={homeFor(user)} replace />;
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setError(null);
     setLoading(true);
     // Mock authentication for prototype purposes only.
     setTimeout(() => {
+      const result = login(form.email);
       setLoading(false);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       notify("Welcome back", { description: "Signed in successfully.", variant: "success" });
-      navigate("/dashboard");
+      // Go back to where they were headed only if their role can open it.
+      const canOpenFrom = from && from.startsWith("/admin") === (result.user.role === "admin");
+      navigate(canOpenFrom ? from : homeFor(result.user), { replace: true });
     }, 700);
   };
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+    <div className="grid min-h-screen lg:grid-cols-2">
       {/* Brand panel */}
-      <div className="relative hidden flex-col justify-between overflow-hidden bg-ink-800 px-14 py-12 lg:flex">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 1.5px 1.5px, white 1px, transparent 0)",
-            backgroundSize: "28px 28px",
-          }}
-        />
-        <div
-          className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-accent-500/20 blur-3xl"
-        />
+      <div className="hidden flex-col justify-between bg-tint-soft px-16 py-12 lg:flex">
+        <Logo size="lg" />
 
-        <Logo variant="light" size="lg" />
-
-        <div className="relative max-w-md">
-          <p className="font-display text-[34px] leading-[1.2] text-white">
+        <div className="max-w-md">
+          <p className="text-4xl leading-tight font-bold text-ink">
             Smarter meetings,
             <br />
             better collaboration.
           </p>
-          <p className="mt-4 text-[14.5px] leading-relaxed text-white/55">
-            QUORUM brings every meeting room in the building onto one screen —
-            so your team spends less time chasing chat threads and more time
-            in the room.
+          <p className="mt-6 text-base leading-relaxed text-muted-foreground">
+            QUORUM brings every meeting room in the building onto one screen, so your team spends
+            less time chasing chat threads and more time in the room.
           </p>
-
-          <div className="mt-10 space-y-4">
-            {[
-              { icon: CalendarClock, text: "Real-time room availability across every floor" },
-              { icon: Users2, text: "One place to book, manage, and cancel reservations" },
-              { icon: ShieldCheck, text: "No more double-booked rooms or chat-thread chaos" },
-            ].map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/8 text-accent-300">
-                  <Icon size={16} />
-                </div>
-                <p className="text-[13.5px] text-white/70">{text}</p>
-              </div>
-            ))}
-          </div>
         </div>
 
-        <p className="relative text-[12.5px] text-white/35">
-          © 2026 QUORUM Workplace Systems. Internal employee portal.
-        </p>
+        <p className="text-sm text-muted-foreground">© 2026 QUORUM Workplace Systems. Internal employee portal.</p>
       </div>
 
       {/* Form panel */}
-      <div className="flex items-center justify-center bg-paper px-6 py-12 sm:px-10">
+      <div className="flex items-center justify-center bg-background px-6 py-12 sm:px-10">
         <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden">
+          <div className="mb-12 lg:hidden">
             <Logo />
           </div>
 
-          <h1 className="font-display text-[26px] text-ink-800">Sign in to your account</h1>
-          <p className="mt-1.5 text-[14px] text-slate-500">
-            Enter your company credentials to continue.
-          </p>
+          <h1 className="text-3xl font-bold">Sign in to your account</h1>
+          <p className="mt-3 text-base text-muted-foreground">Enter your company credentials to continue.</p>
 
-          <form className="mt-8 space-y-4.5" onSubmit={handleSubmit}>
-            <Input
-              label="Work email"
-              type="email"
-              icon={Mail}
-              placeholder="you@company.com"
-              required
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
-            <Input
-              label="Password"
-              type={showPassword ? "text" : "password"}
-              icon={Lock}
-              placeholder="Enter your password"
-              required
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              suffix={
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="rounded-md p-2 text-mist-300 hover:text-ink-700"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              }
-            />
-
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 text-[13px] font-medium text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  className="h-4 w-4 rounded border-mist-300 text-slate-600 focus:ring-slate-500/30"
+          <form className="mt-12" onSubmit={handleSubmit}>
+            <FieldGroup className="gap-6">
+              <Field>
+                <FieldLabel htmlFor="email">Work email</FieldLabel>
+                <IconInput
+                  id="email"
+                  type="email"
+                  icon={Mail}
+                  placeholder="you@company.com"
+                  required
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
-                Remember me
-              </label>
-              <button
-                type="button"
-                className="text-[13px] font-semibold text-slate-600 hover:text-ink-800"
-              >
-                Forgot password?
-              </button>
-            </div>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <IconInput
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  icon={Lock}
+                  placeholder="Enter your password"
+                  required
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  suffix={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff /> : <Eye />}
+                    </Button>
+                  }
+                />
+                {error && <FieldError>{error}</FieldError>}
+              </Field>
 
-            <Button type="submit" fullWidth size="lg" icon={ArrowRight} iconPosition="right" loading={loading}>
-              Sign in
-            </Button>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Checkbox id="remember" checked={remember} onCheckedChange={(v) => setRemember(v === true)} />
+                  <Label htmlFor="remember" className="font-medium text-foreground/80">
+                    Remember me
+                  </Label>
+                </div>
+                <Button type="button" variant="link" className="h-auto p-0 text-sm text-muted-foreground hover:text-foreground">
+                  Forgot password?
+                </Button>
+              </div>
+
+              <Button type="submit" size="lg" className="w-full" disabled={loading}>
+                {loading ? "Signing in…" : "Sign in"}
+                {!loading && <ArrowRight />}
+              </Button>
+            </FieldGroup>
           </form>
 
-          <p className="mt-8 text-center text-[12.5px] text-mist-300">
-            This is a frontend prototype — any credentials will sign you in.
-          </p>
+          <div className="mt-12 rounded-xl bg-tint-soft p-4 text-sm text-muted-foreground">
+            <p className="font-semibold text-foreground">Prototype sign-in</p>
+            <p className="mt-1">
+              {wantsAdmin
+                ? "The admin area needs an administrator account. "
+                : "Any credentials work. "}
+              An email containing <span className="font-medium text-foreground">admin</span> opens the
+              administrator area; anything else signs in as an employee.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setForm((f) => ({ ...f, email: "admin@company.com", password: f.password || "demo" }))}
+              >
+                Fill administrator demo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setForm((f) => ({ ...f, email: "alya.ramadhani@company.com", password: f.password || "demo" }))}
+              >
+                Fill employee demo
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

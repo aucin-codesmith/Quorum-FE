@@ -1,141 +1,113 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  CalendarPlus,
-  CalendarClock,
-  CheckCircle2,
-  Activity,
-  ArrowRight,
-  Sparkles,
-} from "lucide-react";
-import StatCard from "../../components/common/StatCard";
-import Button from "../../components/common/Button";
-import RoomCard from "../../components/rooms/RoomCard";
-import ReservationCard from "../../components/reservations/ReservationCard";
-import EmptyState from "../../components/common/EmptyState";
-import { rooms, currentUser, activityFeed } from "../../data/mockData";
-import { useReservations } from "../../hooks/useReservations";
+import { CalendarPlus, CalendarClock, CheckCircle2, Activity, ArrowRight } from "lucide-react";
+import PageHeader from "@/components/common/PageHeader";
+import StatCard from "@/components/common/StatCard";
+import EmptyState from "@/components/common/EmptyState";
+import RoomCard from "@/components/rooms/RoomCard";
+import ReservationCard from "@/components/reservations/ReservationCard";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { activityFeed } from "@/data/mockData";
+import { useAuth } from "@/hooks/useAuth";
+import { useReservations } from "@/hooks/useReservations";
+import { useRooms } from "@/hooks/useRooms";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { reservations } = useReservations();
+  const { user } = useAuth();
+  const { rooms } = useRooms();
+  const { myReservations } = useReservations();
 
   const upcoming = useMemo(
-    () => reservations.filter((r) => r.status === "upcoming"),
-    [reservations]
+    () => myReservations.filter((r) => r.status === "upcoming").sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)),
+    [myReservations]
   );
-  const active = upcoming.length;
   const completed = useMemo(
-    () => reservations.filter((r) => r.status === "completed").length,
-    [reservations]
+    () => myReservations.filter((r) => r.status === "completed").length,
+    [myReservations]
   );
 
-  const firstName = currentUser.name.split(" ")[0];
+  const firstName = user.name.split(" ")[0];
+  const active = upcoming.length;
 
   return (
-    <div className="space-y-8">
-      {/* Hero / greeting */}
-      <div className="relative overflow-hidden rounded-2xl bg-ink-800 px-6 py-8 sm:px-9 sm:py-10">
-        <div
-          className="pointer-events-none absolute -top-20 -right-16 h-64 w-64 rounded-full bg-accent-500/25 blur-3xl"
-        />
-        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="flex items-center gap-1.5 text-[12px] font-bold tracking-[0.08em] text-accent-300 uppercase">
-              <Sparkles size={13} /> Good to see you
-            </p>
-            <h1 className="mt-1.5 font-display text-[28px] text-white sm:text-[32px]">
-              Welcome back, {firstName}
-            </h1>
-            <p className="mt-2 max-w-md text-[14px] text-white/55">
-              You have {active} upcoming {active === 1 ? "reservation" : "reservations"} this
-              week. Book a room in seconds or check what&apos;s on your calendar.
-            </p>
-          </div>
-          <Button
-            size="lg"
-            icon={CalendarPlus}
-            className="bg-white text-ink-800 hover:bg-mist-100 shrink-0"
-            onClick={() => navigate("/rooms")}
-          >
-            Book a Room
+    <div className="space-y-12">
+      <PageHeader
+        title={`Welcome back, ${firstName}`}
+        description={`You have ${active} upcoming ${active === 1 ? "reservation" : "reservations"}.`}
+        actions={
+          <Button size="lg" onClick={() => navigate("/booking")}>
+            <CalendarPlus /> Book a room
           </Button>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Upcoming Reservations" value={upcoming.length} icon={CalendarClock} tone="accent" />
-        <StatCard label="Active Reservations" value={active} icon={Activity} />
-        <StatCard label="Completed Meetings" value={completed} icon={CheckCircle2} tone="success" />
+        <StatCard label="Upcoming reservations" value={upcoming.length} icon={CalendarClock} />
+        <StatCard label="Active reservations" value={active} icon={Activity} />
+        <StatCard label="Completed meetings" value={completed} icon={CheckCircle2} tone="success" />
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Upcoming reservations */}
-        <div className="lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-ink-800">Upcoming Reservations</h2>
-            <button
-              onClick={() => navigate("/my-reservations")}
-              className="flex items-center gap-1 text-[13px] font-semibold text-slate-600 hover:text-ink-800"
-            >
-              View all <ArrowRight size={14} />
-            </button>
-          </div>
-
-          {upcoming.length === 0 ? (
-            <EmptyState
-              icon={CalendarClock}
-              title="No upcoming reservations"
-              description="Book a meeting room to see it appear here."
-              action={
-                <Button size="sm" icon={CalendarPlus} onClick={() => navigate("/rooms")}>
-                  Book a Room
-                </Button>
-              }
-            />
-          ) : (
-            <div className="space-y-3">
-              {upcoming.slice(0, 3).map((r) => (
-                <ReservationCard key={r.id} reservation={r} />
-              ))}
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
+        <div className="space-y-12 lg:col-span-2">
+          <section>
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Upcoming reservations</h2>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/my-reservations")}>
+                View all <ArrowRight />
+              </Button>
             </div>
-          )}
 
-          {/* Recent activity */}
-          <div className="mt-8">
-            <h2 className="mb-4 text-[15px] font-bold text-ink-800">Recent Activity</h2>
-            <div className="divide-y divide-mist-100 rounded-2xl border border-mist-200 bg-white">
+            {upcoming.length === 0 ? (
+              <EmptyState
+                icon={CalendarClock}
+                title="Nothing booked yet"
+                description="Start by choosing a room, and your next meeting will show up here."
+                action={
+                  <Button variant="outline" size="sm" onClick={() => navigate("/rooms")}>
+                    <CalendarPlus /> Choose a room
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="space-y-4">
+                {upcoming.slice(0, 3).map((r) => (
+                  <ReservationCard key={r.id} reservation={r} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-6 text-xl font-semibold">Recent activity</h2>
+            <Card className="gap-0 divide-y py-0">
               {activityFeed.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-4 px-4.5 py-3.5">
-                  <p className="text-[13.5px] text-ink-700">{item.text}</p>
-                  <span className="shrink-0 text-[12px] text-mist-300">{item.time}</span>
+                <div key={item.id} className="flex items-center justify-between gap-4 px-6 py-4">
+                  <p className="text-[15px] text-foreground/80">{item.text}</p>
+                  <span className="shrink-0 text-sm text-muted-foreground">{item.time}</span>
                 </div>
               ))}
-            </div>
-          </div>
+            </Card>
+          </section>
         </div>
 
-        {/* Available rooms preview */}
-        <div>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-ink-800">Available Now</h2>
-            <button
-              onClick={() => navigate("/rooms")}
-              className="flex items-center gap-1 text-[13px] font-semibold text-slate-600 hover:text-ink-800"
-            >
-              Browse <ArrowRight size={14} />
-            </button>
+        <section>
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Available now</h2>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/rooms")}>
+              Browse <ArrowRight />
+            </Button>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-6">
             {rooms
               .filter((r) => r.status === "available")
               .slice(0, 2)
               .map((room) => (
-                <RoomCard key={room.id} room={room} compact />
+                <RoomCard key={room.id} room={room} />
               ))}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
