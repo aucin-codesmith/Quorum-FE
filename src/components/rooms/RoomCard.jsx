@@ -1,78 +1,49 @@
 import { useNavigate } from "react-router-dom";
 import { Users, MapPin } from "lucide-react";
-import Badge from "../common/Badge";
-import Button from "../common/Button";
-import { statusMeta } from "../../utils/format";
+import StatusBadge from "@/components/common/StatusBadge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
-export default function RoomCard({ room, compact = false }) {
+// Only what matters at a glance: name, capacity, floor, status. Facilities live on the detail page.
+export default function RoomCard({ room }) {
   const navigate = useNavigate();
-  const meta = statusMeta(room.status);
   const isAvailable = room.status === "available";
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-2xl border border-mist-200 bg-white shadow-card transition-shadow hover:shadow-panel">
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-mist-100">
-        <img
-          src={room.image}
-          alt={room.name}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-        />
-        <div className="absolute top-3 left-3">
-          <Badge tone={meta.tone} className="bg-white/95 shadow-sm">
-            {meta.label}
-          </Badge>
+    <Card className="gap-0 py-0 transition-shadow duration-200 hover:shadow-md">
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-tint-soft">
+        <img src={room.image} alt={room.name} loading="lazy" className="h-full w-full object-cover" />
+        <div className="absolute top-4 left-4">
+          <StatusBadge status={room.status} className="bg-background" />
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col p-4.5">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-display text-[17px] text-ink-800">{room.name}</h3>
-          <span className="flex shrink-0 items-center gap-1 text-[13px] font-medium text-slate-500">
-            <Users size={14} /> {room.capacity}
+      <CardContent className="flex flex-1 flex-col p-6">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-lg font-semibold">{room.name}</h3>
+          <span className="flex shrink-0 items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Users size={16} /> {room.capacity}
           </span>
         </div>
-        <p className="mt-0.5 flex items-center gap-1 text-[12.5px] text-mist-300">
-          <MapPin size={12.5} /> {room.floor}
+        <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <MapPin size={16} className="text-primary-soft" /> {room.floor}
         </p>
 
-        {!compact && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {room.facilities.slice(0, 3).map((f) => (
-              <span
-                key={f}
-                className="rounded-md bg-mist-50 px-2 py-1 text-[11.5px] font-medium text-slate-600"
-              >
-                {f}
-              </span>
-            ))}
-            {room.facilities.length > 3 && (
-              <span className="rounded-md bg-mist-50 px-2 py-1 text-[11.5px] font-medium text-slate-500">
-                +{room.facilities.length - 3}
-              </span>
-            )}
-          </div>
-        )}
-
-        <div className="mt-4 flex gap-2 pt-1">
-          <Button
-            variant="secondary"
-            size="sm"
-            fullWidth
-            onClick={() => navigate(`/rooms/${room.id}`)}
-          >
-            View Details
+        <div className="mt-6 flex gap-3">
+          <Button variant="ghost" size="sm" className="flex-1" onClick={() => navigate(`/rooms/${room.id}`)}>
+            View details
           </Button>
           <Button
+            variant="outline"
             size="sm"
-            fullWidth
+            className="flex-1"
             disabled={!isAvailable}
             onClick={() => navigate(`/booking?room=${room.id}`)}
           >
-            Book Room
+            Book room
           </Button>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

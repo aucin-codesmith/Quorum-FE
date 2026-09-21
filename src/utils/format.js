@@ -29,21 +29,30 @@ export function getInitials(name) {
     .toUpperCase();
 }
 
+// Maps a status onto a Badge variant. The label always carries the meaning; colour is secondary.
 export function statusMeta(status) {
   switch (status) {
     case "available":
-      return { label: "Available", tone: "success" };
+      return { label: "Available", variant: "success" };
     case "occupied":
-      return { label: "Occupied", tone: "danger" };
+      return { label: "Occupied", variant: "danger" };
     case "maintenance":
-      return { label: "Under Maintenance", tone: "warning" };
+      return { label: "Under maintenance", variant: "neutral" };
     case "upcoming":
-      return { label: "Upcoming", tone: "accent" };
+      return { label: "Upcoming", variant: "accent" };
     case "completed":
-      return { label: "Completed", tone: "neutral" };
+      return { label: "Completed", variant: "neutral" };
     case "cancelled":
-      return { label: "Cancelled", tone: "danger" };
+      return { label: "Cancelled", variant: "danger" };
+    case "active":
+      return { label: "Active", variant: "success" };
+    case "inactive":
+      return { label: "Inactive", variant: "neutral" };
     default:
-      return { label: status, tone: "neutral" };
+      return { label: status, variant: "neutral" };
   }
+}
+
+export function roleLabel(role) {
+  return role === "admin" ? "Administrator" : "Employee";
 }

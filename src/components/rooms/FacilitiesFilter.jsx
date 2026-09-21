@@ -1,22 +1,29 @@
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
 export default function FacilitiesFilter({ options, selected, onToggle }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((facility) => {
-        const active = selected.includes(facility);
-        return (
-          <button
-            key={facility}
-            onClick={() => onToggle(facility)}
-            className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition-colors ${
-              active
-                ? "border-slate-600 bg-slate-600 text-white"
-                : "border-mist-200 bg-white text-slate-600 hover:border-mist-300"
-            }`}
-          >
-            {facility}
-          </button>
-        );
-      })}
-    </div>
+    <ToggleGroup
+      type="multiple"
+      value={selected}
+      onValueChange={(next) => {
+        // onToggle flips a single facility; find the one that changed.
+        const changed = [...options].find((o) => next.includes(o) !== selected.includes(o));
+        if (changed) onToggle(changed);
+      }}
+      spacing={2}
+      className="flex w-full flex-wrap justify-start gap-2"
+      aria-label="Filter by facilities"
+    >
+      {options.map((facility) => (
+        <ToggleGroupItem
+          key={facility}
+          value={facility}
+          variant="outline"
+          className="h-10 rounded-full px-4 text-sm font-medium text-muted-foreground data-[state=on]:border-primary data-[state=on]:bg-tint data-[state=on]:text-foreground"
+        >
+          {facility}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 }
