@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/useToast";
 import { useUsers } from "@/hooks/useUsers";
 import { applyApiErrors, errorMessage } from "@/lib/formErrors";
 import { formatDate, formatTime, formatTimeRange } from "@/utils/format";
-import { overlaps, timeSlots, timeToMinutes, toISODate } from "@/utils/date";
+import { nowTime, overlaps, timeSlots, timeToMinutes, todayISO, toISODate } from "@/utils/date";
 
 const startOfToday = () => {
   const d = new Date();
@@ -31,9 +31,7 @@ const startOfToday = () => {
   return d;
 };
 
-const startOptions = timeSlots.slice(0, -1).map((t) => ({ value: t, label: formatTime(t) }));
-
-function buildSchema({ rooms, isAdmin }) {
+function buildSchema({ isAdmin }) {
   return z
     .object({
       userId: z.string(),
@@ -43,7 +41,8 @@ function buildSchema({ rooms, isAdmin }) {
       date: z.date().nullable(),
       startTime: z.string().min(1, "Choose a start time."),
       endTime: z.string().min(1, "Choose an end time."),
-      participants: z.string().regex(/^\d+$/, "Enter a whole number."),
+      // Whole numbers only, no leading zero trick to sneak in a lower value (e.g. "01").
+      participants: z.string().regex(/^[1-9]\d*$/, "Enter at least 1 participant."),
     })
     .superRefine((v, ctx) => {
       if (isAdmin && !v.userId) ctx.addIssue({ code: "custom", path: ["userId"], message: "Choose who this is for." });
@@ -52,18 +51,15 @@ function buildSchema({ rooms, isAdmin }) {
       if (v.startTime && v.endTime && timeToMinutes(v.endTime) <= timeToMinutes(v.startTime)) {
         ctx.addIssue({ code: "custom", path: ["endTime"], message: "End time must be after the start time." });
       }
-      const count = Number(v.participants);
-      if (/^\d+$/.test(v.participants)) {
-        const room = rooms.find((r) => r.id === v.roomId);
-        if (count < 1) ctx.addIssue({ code: "custom", path: ["participants"], message: "At least one participant." });
-        else if (room && count > room.capacity) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["participants"],
-            message: `${room.name} seats up to ${room.capacity}. Choose a larger room or fewer participants.`,
-          });
+      // Today's already-passed slots are greyed out in the pickers, but a value chosen before
+      // midnight (or the default) can still age past "now" while the form sits open.
+      if (v.date && toISODate(v.date) === todayISO()) {
+        if (v.startTime && timeToMinutes(v.startTime) <= timeToMinutes(nowTime())) {
+          ctx.addIssue({ code: "custom", path: ["startTime"], message: "Choose a time later than now." });
         }
       }
+      // Exceeding the room's capacity is surfaced as a warning near the field (see
+      // ReservationFormBody), not a blocking error: the booking can still go ahead.
     });
 }
 
@@ -96,7 +92,7 @@ function ReservationFormBody({ mode, onDone, rooms, users }) {
   const [submitting, setSubmitting] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
 
-  const schema = useMemo(() => buildSchema({ rooms, isAdmin }), [rooms, isAdmin]);
+  const schema = useMemo(() => buildSchema({ isAdmin }), [isAdmin]);
 
   const preselected = searchParams.get("room");
   const defaultRoom = rooms.find((r) => r.id === preselected && r.status === "available") ?? rooms.find((r) => r.status === "available");
@@ -136,9 +132,19 @@ function ReservationFormBody({ mode, onDone, rooms, users }) {
   const roomUnavailable = room && room.status !== "available";
   const blocked = Boolean(conflict) || Boolean(roomUnavailable);
 
+  // Only today's own slots need greying out; a future date has nothing in the past yet.
+  const isToday = Boolean(date) && toISODate(date) === todayISO();
+  const nowMinutes = timeToMinutes(nowTime());
+
+  const startOptions = timeSlots
+    .slice(0, -1)
+    .map((t) => ({ value: t, label: formatTime(t), disabled: isToday && timeToMinutes(t) <= nowMinutes }));
   const endOptions = timeSlots
     .filter((t) => timeToMinutes(t) > timeToMinutes(startTime || "00:00"))
-    .map((t) => ({ value: t, label: formatTime(t) }));
+    .map((t) => ({ value: t, label: formatTime(t), disabled: isToday && timeToMinutes(t) <= nowMinutes }));
+
+  const participantsCount = Number(participants);
+  const overCapacity = room && Number.isInteger(participantsCount) && participantsCount > room.capacity;
 
   const onStartChange = (field) => (next) => {
     field.onChange(next);
@@ -385,6 +391,13 @@ function ReservationFormBody({ mode, onDone, rooms, users }) {
                     <FieldLabel htmlFor="participants">Number of participants</FieldLabel>
                     <IconInput
                       {...field}
+                      // A plain onChange, not field.onChange: strips anything that isn't a digit
+                      // (minus sign, "e", ".", pasted text) so the value can never read as
+                      // negative or non-numeric, and drops a leading 0 (min is 1, not 0).
+                      onChange={(e) => field.onChange(e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))}
+                      // Number inputs still accept these keys even with min={1}; block them so the
+                      // field never briefly shows a negative or decimal value while typing.
+                      onKeyDown={(e) => ["-", "+", "e", "E", "."].includes(e.key) && e.preventDefault()}
                       id="participants"
                       type="number"
                       min={1}
@@ -393,6 +406,12 @@ function ReservationFormBody({ mode, onDone, rooms, users }) {
                       aria-invalid={fieldState.invalid}
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    {!fieldState.invalid && overCapacity && (
+                      <FieldDescription className="flex items-center gap-1.5 text-danger">
+                        <AlertCircle size={14} className="shrink-0" />
+                        {room.name} seats up to {room.capacity}. You can still book, but consider a larger room.
+                      </FieldDescription>
+                    )}
                   </Field>
                 )}
               />
