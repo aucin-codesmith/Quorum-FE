@@ -159,7 +159,7 @@ export default function AdminReservationsPage() {
                     <TableCell>
                       <button
                         onClick={() => setOpenId(r.id)}
-                        className="max-w-56 truncate text-left font-semibold text-foreground hover:underline"
+                        className="max-w-56 truncate rounded text-left font-semibold text-foreground outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
                       >
                         {r.title}
                       </button>

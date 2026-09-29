@@ -68,7 +68,7 @@ export default function TableFilters({ query, onQueryChange, searchPlaceholder, 
                   type="button"
                   onClick={() => f.onChange(ANY)}
                   aria-label={`Clear ${f.label} filter`}
-                  className="grid size-5 place-items-center rounded-full hover:bg-tint"
+                  className="grid size-5 place-items-center rounded-full outline-none hover:bg-tint focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
                   <X size={12} />
                 </button>

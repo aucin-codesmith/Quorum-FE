@@ -33,7 +33,7 @@ export default function Sidebar({ items, area, onNavigate }) {
             end={end}
             onClick={onNavigate}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-4 py-3 text-[15px] transition-colors ${
+              `flex items-center gap-3 rounded-lg px-4 py-3 text-[15px] outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 ${
                 isActive
                   ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
                   : "font-medium text-muted-foreground hover:bg-accent hover:text-foreground"

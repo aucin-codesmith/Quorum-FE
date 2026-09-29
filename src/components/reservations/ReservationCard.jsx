@@ -13,7 +13,7 @@ export default function ReservationCard({ reservation }) {
     <Card className="p-0 transition-shadow duration-200 hover:shadow-md">
       <button
         onClick={() => navigate(`/my-reservations/${reservation.id}`)}
-        className="flex w-full items-center gap-4 rounded-xl p-6 text-left"
+        className="flex w-full items-center gap-4 rounded-xl p-6 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <div className="hidden h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-tint-soft text-foreground sm:flex">
           <span className="text-xs font-medium">{date.toLocaleDateString("en-US", { month: "short" })}</span>
