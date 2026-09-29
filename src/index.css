@@ -3,6 +3,12 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* This app ships one light theme only, with no dark toggle. Tailwind's `dark:` variant defaults to
+   `@media (prefers-color-scheme: dark)`, so any leftover `dark:*` class the shadcn primitives carry
+   would otherwise fire on its own for a visitor whose OS prefers dark, without a matching dark
+   palette behind it. Gating `dark:` behind a `.dark` class this app never adds keeps it inert. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Cloud Dancer palette — design-rules-meeting-room-booking.md */
   --color-ink: #081f5c;
@@ -39,7 +45,12 @@
   --accent-foreground: #081f5c;
   --destructive: #a65249;
   --border: #d0e3ff;
-  --input: #d0e3ff;
+  /* Form controls (input/select/textarea/checkbox) and outline buttons need a border that is
+     visible on its own, since it is the only cue that they are there: ink at 50% opacity clears
+     WCAG 1.4.11's 3:1 non-text contrast against --color-canvas (measured 3.20:1), unlike --tint's
+     1.27:1. Dividers, cards, dialogs, popovers and badges keep the soft --border tint: they carry
+     padding, elevation or an overlay that already sets them apart, so a hairline suffices there. */
+  --input: color-mix(in srgb, var(--color-ink) 50%, transparent);
   --ring: #334eac;
   --chart-1: #334eac;
   --chart-2: #7096d1;
