@@ -44,10 +44,14 @@ export function useRoomMutations() {
     onSuccess: refresh,
   });
   const remove = useMutation({ mutationFn: (id) => api.delete(`/api/rooms/${id}`), onSuccess: refresh });
+  // Stores the file and returns its URL; on its own this doesn't attach it to any room, so nothing
+  // to invalidate here. Pass the URL as `image` to addRoom/updateRoom right after.
+  const uploadImage = useMutation({ mutationFn: (file) => api.upload("/api/uploads/room-images", { file }).then((r) => r.data.url) });
 
   return {
     addRoom: add.mutateAsync,
     updateRoom: (id, patch) => update.mutateAsync({ id, patch }),
     deleteRoom: remove.mutateAsync,
+    uploadRoomImage: uploadImage.mutateAsync,
   };
 }

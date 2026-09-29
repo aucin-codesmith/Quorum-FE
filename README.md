@@ -80,6 +80,11 @@ revoked token returns you to the login page.
   the API still enforces the rule on submit.
 - The API nests `room` and `user` inside a reservation; the hooks flatten them
   to `roomName`, `userName` and so on, so components stay simple.
+- A room's photo (in the admin Rooms form) is a real file upload, not a URL
+  field: `api.upload()` sends it to `POST /api/uploads/room-images`, and the
+  URL it returns is sent as `image` when the room is created or updated. The
+  API stores the file and returns an absolute URL either way, so `room.image`
+  is used as-is everywhere it is displayed.
 
 ## Project structure
 

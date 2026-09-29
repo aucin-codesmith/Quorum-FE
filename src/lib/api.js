@@ -57,8 +57,11 @@ function buildUrl(path, query) {
 }
 
 // Resolves to the full envelope: { data, meta? }. 204 resolves to null.
+// A FormData body (file uploads) is sent as-is, so fetch can set its own multipart Content-Type
+// with the correct boundary; anything else is JSON-encoded.
 async function request(method, path, { body, query, signal, auth = true } = {}) {
   const token = auth ? tokenStore.get() : null;
+  const isForm = body instanceof FormData;
 
   let res;
   try {
@@ -66,10 +69,10 @@ async function request(method, path, { body, query, signal, auth = true } = {}) 
       method,
       signal,
       headers: {
-        ...(body !== undefined && { "Content-Type": "application/json" }),
+        ...(body !== undefined && !isForm && { "Content-Type": "application/json" }),
         ...(token && { Authorization: `Bearer ${token}` }),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
   } catch (err) {
     if (err.name === "AbortError") throw err;
@@ -99,4 +102,10 @@ export const api = {
   post: (path, opts) => request("POST", path, opts),
   put: (path, opts) => request("PUT", path, opts),
   delete: (path, opts) => request("DELETE", path, opts),
+  // Uploads one file as multipart/form-data under `field` (matches the API's expected form field name).
+  upload: (path, { file, field = "image", signal } = {}) => {
+    const form = new FormData();
+    form.append(field, file);
+    return request("POST", path, { body: form, signal });
+  },
 };
