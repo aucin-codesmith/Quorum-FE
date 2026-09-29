@@ -189,11 +189,11 @@ function ReservationFormBody({ mode, onDone, rooms, users }) {
   };
 
   const summaryRows = [
-    isAdmin && { label: "Booked for", value: owner?.name ?? "—" },
-    { label: "Meeting", value: title?.trim() || "—" },
-    { label: "Date", value: date ? formatDate(toISODate(date), { short: true }) : "—" },
+    isAdmin && { label: "Booked for", value: owner?.name ?? "Not chosen yet" },
+    { label: "Meeting", value: title?.trim() || "Not named yet" },
+    { label: "Date", value: date ? formatDate(toISODate(date), { short: true }) : "Not picked yet" },
     { label: "Time", value: formatTimeRange(startTime, endTime) },
-    { label: "Participants", value: participants || "—" },
+    { label: "Participants", value: participants || "Not set yet" },
   ].filter(Boolean);
 
   return (

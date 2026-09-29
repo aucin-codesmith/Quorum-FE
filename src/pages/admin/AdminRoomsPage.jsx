@@ -25,7 +25,7 @@ export default function AdminRoomsPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("any");
   const [page, setPage] = useState(1);
-  const [form, setForm] = useState(null); // { room } — room null means "add"
+  const [form, setForm] = useState(null); // { room }; room null means "add"
   const [toDelete, setToDelete] = useState(null);
 
   const q = useDebouncedValue(query.trim());

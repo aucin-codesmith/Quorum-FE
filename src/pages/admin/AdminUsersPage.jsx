@@ -31,7 +31,7 @@ export default function AdminUsersPage() {
   const [role, setRole] = useState("any");
   const [status, setStatus] = useState("any");
   const [page, setPage] = useState(1);
-  const [form, setForm] = useState(null); // { user } — user null means "add"
+  const [form, setForm] = useState(null); // { user }; user null means "add"
   const [toDelete, setToDelete] = useState(null);
 
   const q = useDebouncedValue(query.trim());
@@ -185,7 +185,7 @@ export default function AdminUsersPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <p className="text-foreground">{u.jobTitle || "—"}</p>
+                        <p className="text-foreground">{u.jobTitle || "No title set"}</p>
                         <p className="text-sm text-muted-foreground">{u.department}</p>
                       </TableCell>
                       <TableCell>
