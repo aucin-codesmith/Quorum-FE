@@ -144,12 +144,29 @@ function ReservationFormBody({ mode, onDone, rooms, users }) {
   const isToday = Boolean(date) && toISODate(date) === todayISO();
   const nowMinutes = timeToMinutes(nowTime());
 
-  const startOptions = timeSlots
-    .slice(0, -1)
-    .map((t) => ({ value: t, label: formatTime(t), disabled: isToday && timeToMinutes(t) <= nowMinutes }));
+  // A boundary lands "inside" an existing booking, not just touching it, so a new reservation can
+  // still start the moment one ends or end the moment one begins (the same half-open rule `overlaps`
+  // already uses below). Start and end need their own half of that rule, or the boundary shared with
+  // a booking (its start for a new start, its end for a new end) would be wrongly struck out too.
+  const startsDuringBooking = (t) => {
+    const m = timeToMinutes(t);
+    return slots.some((s) => timeToMinutes(s.startTime) <= m && m < timeToMinutes(s.endTime));
+  };
+  const endsDuringBooking = (t) => {
+    const m = timeToMinutes(t);
+    return slots.some((s) => timeToMinutes(s.startTime) < m && m <= timeToMinutes(s.endTime));
+  };
+
+  const startOptions = timeSlots.slice(0, -1).map((t) => {
+    const booked = startsDuringBooking(t);
+    return { value: t, label: formatTime(t), disabled: (isToday && timeToMinutes(t) <= nowMinutes) || booked, warning: booked };
+  });
   const endOptions = timeSlots
     .filter((t) => timeToMinutes(t) > timeToMinutes(startTime || "00:00"))
-    .map((t) => ({ value: t, label: formatTime(t), disabled: isToday && timeToMinutes(t) <= nowMinutes }));
+    .map((t) => {
+      const booked = endsDuringBooking(t);
+      return { value: t, label: formatTime(t), disabled: (isToday && timeToMinutes(t) <= nowMinutes) || booked, warning: booked };
+    });
 
   const participantsCount = Number(participants);
   const overCapacity = room && Number.isInteger(participantsCount) && participantsCount > room.capacity;
