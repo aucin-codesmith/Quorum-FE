@@ -97,6 +97,12 @@ function ReservationFormBody({ mode, onDone, rooms, users }) {
   const preselected = searchParams.get("room");
   const defaultRoom = rooms.find((r) => r.id === preselected && r.status === "available") ?? rooms.find((r) => r.status === "available");
 
+  // The date starts pre-filled with today rather than blank, so the past-slot greying-out below
+  // is already active on the very first render instead of only kicking in once a date is chosen.
+  const initialNowMinutes = timeToMinutes(nowTime());
+  const initialNextSlot = timeSlots.find((t) => timeToMinutes(t) > initialNowMinutes);
+  const initialNextSlotIndex = initialNextSlot ? timeSlots.indexOf(initialNextSlot) : -1;
+
   const { control, handleSubmit, setValue, setError, formState } = useForm({
     resolver: zodResolver(schema),
     mode: "onTouched",
@@ -105,9 +111,11 @@ function ReservationFormBody({ mode, onDone, rooms, users }) {
       roomId: defaultRoom?.id ?? "",
       title: "",
       description: "",
-      date: null,
-      startTime: "09:00",
-      endTime: "10:00",
+      date: startOfToday(),
+      // If every slot today has already passed, these fall back to the usual defaults and the
+      // "choose a time later than now" validation guides the user to pick a different date.
+      startTime: initialNextSlot ?? "09:00",
+      endTime: initialNextSlot ? (timeSlots[initialNextSlotIndex + 2] ?? timeSlots.at(-1)) : "10:00",
       participants: "2",
     },
   });
