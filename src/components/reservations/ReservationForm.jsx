@@ -360,8 +360,12 @@ function ReservationFormBody({ mode, onDone, rooms, users }) {
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     {conflict && (
                       <FieldError>
-                        {conflict.title} already holds this room from {formatTimeRange(conflict.startTime, conflict.endTime)}.
-                        Choose another time or room.
+                        {/* Who holds the room, not what they titled it: the booker's name (and
+                            department, when set) is more actionable than a meeting title, which
+                            is often blank, vague, or none of this visitor's business. */}
+                        {conflict.userName}
+                        {conflict.userDepartment ? ` (${conflict.userDepartment})` : ""} already holds this room from{" "}
+                        {formatTimeRange(conflict.startTime, conflict.endTime)}. Choose another time or room.
                       </FieldError>
                     )}
                   </Field>
