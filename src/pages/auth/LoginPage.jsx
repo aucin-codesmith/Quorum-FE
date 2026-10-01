@@ -10,8 +10,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/useToast";
 import { homeFor } from "@/routes/homeFor";
 
-const DEMO_PASSWORD = "Password123!";
-
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -106,31 +104,6 @@ export default function LoginPage() {
         <p className="mt-4 rounded-xl bg-tint-soft p-4 text-sm text-muted-foreground">
           The admin area needs an administrator account.
         </p>
-      )}
-
-      {import.meta.env.DEV && (
-        <div className="mt-8 rounded-xl bg-tint-soft p-4 text-sm text-muted-foreground">
-          <p className="font-semibold text-foreground">Demo accounts (development only)</p>
-          <p className="mt-1">Seeded by the API. Password for both: {DEMO_PASSWORD}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setForm({ email: "admin@company.com", password: DEMO_PASSWORD })}
-            >
-              Fill administrator demo
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setForm({ email: "alya.ramadhani@company.com", password: DEMO_PASSWORD })}
-            >
-              Fill employee demo
-            </Button>
-          </div>
-        </div>
       )}
     </AuthLayout>
   );
