@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, LogOut, Menu } from "lucide-react";
+import { ChevronDown, LogOut, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -27,11 +27,6 @@ export default function Header({ title, onOpenMenu }) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-          <Bell />
-          <span className="absolute top-2.5 right-2.5 size-1.5 rounded-full bg-danger" />
-        </Button>
-
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-auto gap-2 py-1 pr-2 pl-1" aria-label="Account menu">
